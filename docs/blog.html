@@ -1433,7 +1433,7 @@ from learn import LearnUser        # noqa: F401</code></pre>
 
   <p>
     Same files, no changes &mdash; ship them to <strong>Azure Load
-    Testing</strong> through a one-page YAML. ALT uploads the project,
+    Testing</strong> through a one-page YAML. Azure Load Testing uploads the project,
     spins up engine VMs (1–45), runs the same
     <code>locust -f multi.py</code> behind the scenes, and streams
     results back to a portal dashboard:
@@ -1468,7 +1468,7 @@ env:
   - { name: ADO_ORG,         value: "&lt;your-ado-org&gt;" }
   - { name: ADO_PROJECT,     value: "&lt;your-ado-project&gt;" }
 
-# Bearer tokens stay in Key Vault; ALT&rsquo;s system-assigned identity
+# Bearer tokens stay in Key Vault; Azure Load Testing&rsquo;s system-assigned identity
 # resolves them at run time and injects as env vars.
 secrets:
   - { name: GITHUB_MCP_TOKEN,  value: https://&lt;your-keyvault&gt;.vault.azure.net/secrets/github-mcp-token }
@@ -1480,7 +1480,7 @@ failureCriteria:
   - percentage(error) &gt; 25</code></pre>
 
   <p>
-    Submit it with the Azure CLI. ALT pulls the secrets from Key Vault
+    Submit it with the Azure CLI. Azure Load Testing pulls the secrets from Key Vault
     via its system-assigned identity at run time, so the only thing
     you need locally is an <code>az&nbsp;login</code> against the
     subscription that owns the load-testing resource:
@@ -1503,19 +1503,19 @@ $ az load test-run create \
     One wrinkle worth calling out: the ADO Remote MCP server uses
     Entra&nbsp;ID and its tokens expire in about an hour. If your
     Azure DevOps organisation lives in a different tenant from the
-    subscription that hosts ALT, before each run you need to
+    subscription that hosts Azure Load Testing, before each run you need to
     <code>az&nbsp;login</code> against the ADO tenant, request an
     access token for the Azure DevOps resource, and write it to the
     <code>ado-mcp-token</code> Key Vault secret. Same tenant for both?
     Skip it entirely &mdash; when you run Locust on your laptop your
     <code>az&nbsp;login</code> reads the secrets from Key Vault, and
-    when ALT runs the test in the cloud the load-test resource's
+    when Azure Load Testing runs the test in the cloud the load-test resource's
     managed identity does the same thing.
   </p>
 
   <p>
     Three things keep this honest. <strong>Auth</strong>: secrets never
-    leave Key Vault &mdash; ALT pulls them via managed identity and the
+    leave Key Vault &mdash; Azure Load Testing pulls them via managed identity and the
     user classes read the same env-var names locally and in cloud.
     <strong>Failure criteria</strong> turn the YAML into a pass/fail
     gate suitable for a release pipeline. <strong>Engine count</strong>
@@ -1746,7 +1746,7 @@ $ az load test-run create \
   <p>
     Before sending it to the cloud, the same workload runs in one
     Python process on your laptop. <code>locust.conf</code> pins the
-    knobs (and is the same file ALT consumes via
+    knobs (and is the same file Azure Load Testing consumes via
     <code>userPropertyFile</code>):
   </p>
 
@@ -1791,7 +1791,7 @@ $ az load test-run create \
     --no-wait</code></pre>
 
   <p>
-    ALT spins up an engine, pulls the secrets from Key Vault via its
+    Azure Load Testing spins up an engine, pulls the secrets from Key Vault via its
     managed identity, fans out to the four MCP servers, and writes
     <code>engine1_results.csv</code> back to blob storage. Fifteen
     minutes later:
@@ -1826,35 +1826,11 @@ Count Fail Label
    31    0 github:tools/call:list_issues
    30    0 github:tools/call:get_me</code></pre>
 
-  <p>
-    Three failures out of 2,293 &mdash; all on GitHub's
-    <code>search_code</code>, all legitimate
-    <code>tool isError=true</code> responses from its 30-call/minute
-    rate&nbsp;limit. That's the assertions doing their job: they
-    surface real upstream errors that a plain HTTP&nbsp;200 would have
-    hidden. The pass/fail criteria in the YAML
-    (<code>avg(response_time_ms) &gt; 8000</code>,
-    <code>percentage(error) &gt; 25</code>) both stay green, so ALT
-    closes the run as <code>PASSED</code> &mdash; suitable for a
-    release gate.
-  </p>
-
-  <p>
-    A quick story from the first attempt: the very first ALT run came
-    back with 415 failures (~18&nbsp;%), almost all on Context7. The
-    assertions had caught a config gap that was previously invisible
-    &mdash; the engine was hitting Context7 anonymously and getting
-    throttled. Adding <code>CONTEXT7_API_KEY</code> to the YAML's
-    <code>secrets:</code> block (already shown above) fixed it on the
-    next run. The assertions paid for themselves before the demo even
-    started.
-  </p>
-
   <!-- ============ SECTION 7 ============ -->
   <h2 id="results"><span class="num">7.</span>Results</h2>
 
   <p>
-    ALT bundles a self-contained dashboard with every run &mdash;
+    Azure Load Testing bundles a self-contained dashboard with every run &mdash;
     charts, error explorer, per-minute time series, the lot. Pull it
     down with one command:
   </p>

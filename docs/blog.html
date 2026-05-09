@@ -105,6 +105,12 @@
     margin: 28px 0 10px;
     font-weight: 600;
   }
+  article h3 .num {
+    color: var(--fg-mute);
+    font-weight: 500;
+    margin-right: 10px;
+    font-variant-numeric: tabular-nums;
+  }
   article ul, article ol { padding-left: 22px; margin: 0 0 1.05em; }
   article li { margin-bottom: 6px; }
   article a {
@@ -1459,15 +1465,15 @@ env:
   - { name: LEARN_USERS,     value: "5"  }
   - { name: CONTEXT7_USERS,  value: "5"  }
   - { name: ADO_USERS,       value: "5"  }
-  - { name: ADO_ORG,         value: "krishnaroy" }
-  - { name: ADO_PROJECT,     value: "learn" }
+  - { name: ADO_ORG,         value: "&lt;your-ado-org&gt;" }
+  - { name: ADO_PROJECT,     value: "&lt;your-ado-project&gt;" }
 
 # Bearer tokens stay in Key Vault; ALT&rsquo;s system-assigned identity
 # resolves them at run time and injects as env vars.
 secrets:
-  - { name: GITHUB_MCP_TOKEN,  value: https://kv-mcpload-bd97.vault.azure.net/secrets/github-mcp-token }
-  - { name: ADO_MCP_TOKEN,     value: https://kv-mcpload-bd97.vault.azure.net/secrets/ado-mcp-token }
-  - { name: CONTEXT7_API_KEY,  value: https://kv-mcpload-bd97.vault.azure.net/secrets/context7-api-key }
+  - { name: GITHUB_MCP_TOKEN,  value: https://&lt;your-keyvault&gt;.vault.azure.net/secrets/github-mcp-token }
+  - { name: ADO_MCP_TOKEN,     value: https://&lt;your-keyvault&gt;.vault.azure.net/secrets/ado-mcp-token }
+  - { name: CONTEXT7_API_KEY,  value: https://&lt;your-keyvault&gt;.vault.azure.net/secrets/context7-api-key }
 
 failureCriteria:
   - avg(response_time_ms) &gt; 8000
@@ -1845,99 +1851,397 @@ Count Fail Label
   </p>
 
   <!-- ============ SECTION 7 ============ -->
-  <h2 id="results"><span class="num">7.</span>Reading the dashboard</h2>
+  <h2 id="results"><span class="num">7.</span>Results</h2>
 
   <p>
-    <code>az&nbsp;load&nbsp;test-run download-files&nbsp;--report</code>
-    pulls the same self-contained dashboard that ALT shows in the
-    portal &mdash; a React app plus a few JSON files. Open
-    <code>index.html</code> in a browser and you get charts, tables,
-    and an error explorer wired to the run. A frozen copy of the
-    one I just took lives at
+    ALT bundles a self-contained dashboard with every run &mdash;
+    charts, error explorer, per-minute time series, the lot. Pull it
+    down with one command:
+  </p>
+
+  <pre><code>$ az load test-run download-files \
+    --load-test-resource &lt;your-loadtest-resource&gt; \
+    --resource-group &lt;your-rg&gt; \
+    --test-run-id run-2026-05-09-15m-clean-172854 \
+    --path ./report --report --force
+
+# unzip and open
+$ Expand-Archive ./report/reports.zip -DestinationPath ./report -Force
+$ Invoke-Item ./report/index.html</code></pre>
+
+  <p>
+    A frozen copy of the dashboard from the run above lives at
     <a href="sample-report/index.html"><strong>sample-report/index.html</strong></a>
-    next to this post.
+    next to this post &mdash; click around for the full picture.
   </p>
+
+  <!-- ============ SECTION 7b ============ -->
+  <h3 id="summary"><span class="num">7b.</span>Report</h3>
 
   <p>
-    The interesting bits, distilled:
+    One diagram per server. Blue&nbsp;bar = avg, orange&nbsp;extension =
+    avg&nbsp;&rarr;&nbsp;p90, label = <em>avg&nbsp;/&nbsp;p90</em> in ms.
   </p>
 
-  <h3>Per-server response time (tools/call only, ms)</h3>
+  <style>
+    .perf-fig { margin: 1.5em 0; }
+    .perf-fig svg { display: block; max-width: 100%; height: auto; }
+    .perf-svg .card-name { font: 700 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+    .perf-svg .card-sub  { font: italic 11px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+    .perf-svg .sect-bg   { fill: #f4efe6; }
+    .perf-svg .sect-title{ font: 700 11px -apple-system, "Segoe UI", sans-serif; fill: #1a1a1a; text-transform: uppercase; letter-spacing: 0.06em; }
+    .perf-svg .sect-hint { font: italic 10px -apple-system, "Segoe UI", sans-serif; fill: #8a8a8a; }
+    .perf-svg .tool      { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+    .perf-svg .n         { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
+    .perf-svg .axis      { stroke: #d8d3ca; stroke-width: 1; }
+    .perf-svg .grid      { stroke: #d8d3ca; stroke-width: 1; }
+    .perf-svg .tick      { font: 10px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+    .perf-svg .col-hdr   { font: 600 10px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; text-transform: uppercase; letter-spacing: 0.04em; }
+    .perf-svg .bar-avg   { fill: #5586b3; }
+    .perf-svg .bar-avg-sw{ fill: #5586b3; }
+    .perf-svg .bar-p90-fill { fill: #f4a574; }
+    .perf-svg .bar-p90   { stroke: #b25a00; stroke-width: 2; }
+    .perf-svg .bar-p90-sw{ stroke: #b25a00; stroke-width: 2; fill: none; }
+    .perf-svg .barval    { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+    .perf-svg .barval .p90num { fill: #b25a00; font-weight: 700; }
+    .perf-svg .barval-in { font: 600 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #ffffff; }
+    .perf-svg .barval-p90{ font: 600 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #b25a00; }
+    .perf-svg .err-ok    { fill: #2f7a3a; font: 600 11px -apple-system, "Segoe UI", sans-serif; }
+    .perf-svg .err-bad   { fill: #b23a3a; font: 700 11px -apple-system, "Segoe UI", sans-serif; }
+    .perf-svg .legend-tx { font: 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
 
-  <table>
-    <thead>
-      <tr><th>Server</th><th>Calls</th><th>p50</th><th>p95</th><th>p99</th><th>Max</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>Learn</td>      <td>715</td><td>495</td><td>1018</td><td>1524</td><td>2517</td></tr>
-      <tr><td>ADO Remote</td> <td>634</td><td>889</td><td>1431</td><td>1893</td><td>2732</td></tr>
-      <tr><td>Context7</td>   <td>602</td><td>1421</td><td>1909</td><td>2298</td><td>3917</td></tr>
-      <tr><td>GitHub</td>     <td>284</td><td>619</td><td>1591</td><td>3298</td><td>4107</td></tr>
-      <tr>
-        <td><strong>Aggregate</strong></td>
-        <td><strong>2,235</strong></td>
-        <td><strong>754</strong></td>
-        <td><strong>1,707</strong></td>
-        <td><strong>2,190</strong></td>
-        <td><strong>4,107</strong></td>
-      </tr>
-    </tbody>
-  </table>
+    .server-card {
+      border: 1px solid #e3dccd;
+      border-radius: 14px;
+      padding: 1em 1.25em 0.5em;
+      margin: 1.5em 0;
+      background: #fbfaf6;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      position: relative;
+      overflow: hidden;
+    }
+    .server-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #5586b3 0%, #5586b3 60%, #f4a574 60%, #f4a574 100%);
+    }
+    .server-card .perf-fig { margin: 0.5em 0 0.25em; }
+    .server-card > p { margin: 0.25em 0 0.75em; font-size: 0.95em; color: #2a2a2a; }
+  </style>
 
-  <h3 style="margin-top: 1.25em;">Top tools by traffic and tail latency (ms)</h3>
-
-  <table>
-    <thead>
-      <tr><th>Tool</th><th>Calls</th><th>p50</th><th>p95</th><th>p99</th></tr>
-    </thead>
-    <tbody>
-      <tr><td><code>context7:query-docs</code></td>             <td>441</td><td>1494</td><td>1983</td><td>2348</td></tr>
-      <tr><td><code>learn:microsoft_docs_search</code></td>     <td>372</td><td>512</td><td>952</td><td>1524</td></tr>
-      <tr><td><code>learn:microsoft_code_sample_search</code></td><td>343</td><td>475</td><td>1104</td><td>1649</td></tr>
-      <tr><td><code>ado:wit_work_item</code></td>               <td>328</td><td>478</td><td>1220</td><td>1658</td></tr>
-      <tr><td><code>context7:resolve-library-id</code></td>     <td>161</td><td>1142</td><td>1528</td><td>2286</td></tr>
-      <tr><td><code>ado:search_workitem</code></td>             <td>125</td><td>940</td><td>1436</td><td>1899</td></tr>
-      <tr><td><code>github:search_code</code></td>              <td>84</td><td>270</td><td>3077</td><td>4107</td></tr>
-    </tbody>
-  </table>
-
+  <!-- ===== Learn ===== -->
+  <section class="server-card">
+  <figure class="perf-fig">
+<svg class="perf-svg" viewBox="0 0 800 304" role="img" aria-label="LearnUser: handshake, tool calls, and cleanup performance from a 15-minute Azure Load Testing run.">
+  <text class="card-name" x="0" y="20">LearnUser</text>
+  <text class="card-sub"  x="86" y="20">735 requests &middot; 0 errors &middot; 5 VUs &middot; learn.microsoft.com/api/mcp</text>
+  <rect class="bar-avg" x="540" y="11" width="12" height="9"/><text class="legend-tx" x="558" y="20">avg</text>
+  <rect class="bar-p90-fill" x="595" y="11" width="20" height="9"/><text class="legend-tx" x="621" y="20">to p90</text>
+  <rect class="sect-bg" x="0" y="29" width="800" height="18"/>
+  <text class="sect-title" x="0" y="42">Handshake</text>
+  <text class="sect-hint"  x="800" y="42" text-anchor="end">once per VU</text>
+  <text class="tool" x="0" y="68">initialize</text>
+  <text class="n" x="265" y="68" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="57" width="22.6" height="14"/>
+  <rect class="bar-p90-fill" x="312.6" y="57" width="11.0" height="14"/>
+  <text class="barval" x="328.6" y="68">113<tspan class="p90num"> / 168</tspan></text>
+  <text class="err-ok" x="750" y="68" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="90">notifications/initialized</text>
+  <text class="n" x="265" y="90" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="79" width="10.4" height="14"/>
+  <rect class="bar-p90-fill" x="300.4" y="79" width="5.6" height="14"/>
+  <text class="barval" x="311.0" y="90">52<tspan class="p90num"> / 80</tspan></text>
+  <text class="err-ok" x="750" y="90" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="112">tools/list</text>
+  <text class="n" x="265" y="112" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="101" width="8.8" height="14"/>
+  <rect class="bar-p90-fill" x="298.8" y="101" width="1.0" height="14"/>
+  <text class="barval" x="304.8" y="112">44<tspan class="p90num"> / 49</tspan></text>
+  <text class="err-ok" x="750" y="112" text-anchor="middle">0</text>
+  <rect class="sect-bg" x="0" y="131" width="800" height="18"/>
+  <text class="sect-title" x="0" y="144">Tool calls</text>
+  <text class="sect-hint"  x="800" y="144" text-anchor="end">the workload</text>
+  <text class="tool" x="0" y="170">microsoft_docs_search</text>
+  <text class="n" x="265" y="170" text-anchor="end">372</text>
+  <rect class="bar-avg" x="290" y="159" width="113.4" height="14"/>
+  <rect class="bar-p90-fill" x="403.4" y="159" width="56.8" height="14"/>
+  <text class="barval" x="465.2" y="170">567<tspan class="p90num"> / 851</tspan></text>
+  <text class="err-ok" x="750" y="170" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="192">microsoft_code_sample_search</text>
+  <text class="n" x="265" y="192" text-anchor="end">343</text>
+  <rect class="bar-avg" x="290" y="181" width="109.2" height="14"/>
+  <rect class="bar-p90-fill" x="399.2" y="181" width="59.4" height="14"/>
+  <text class="barval" x="463.6" y="192">546<tspan class="p90num"> / 843</tspan></text>
+  <text class="err-ok" x="750" y="192" text-anchor="middle">0</text>
+  <rect class="sect-bg" x="0" y="211" width="800" height="18"/>
+  <text class="sect-title" x="0" y="224">Cleanup</text>
+  <text class="sect-hint"  x="800" y="224" text-anchor="end">DELETE on stop</text>
+  <text class="tool" x="0" y="250">DELETE /mcp</text>
+  <text class="n" x="265" y="250" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="239" width="19.4" height="14"/>
+  <rect class="bar-p90-fill" x="309.4" y="239" width="21.2" height="14"/>
+  <text class="barval" x="335.6" y="250">97<tspan class="p90num"> / 203</tspan></text>
+  <text class="err-ok" x="750" y="250" text-anchor="middle">0</text>
+  <line class="axis" x1="290" y1="276" x2="690" y2="276"/>
+  <line class="grid" x1="390" y1="272" x2="390" y2="276"/>
+  <line class="grid" x1="490" y1="272" x2="490" y2="276"/>
+  <line class="grid" x1="590" y1="272" x2="590" y2="276"/>
+  <text class="tick" x="290" y="289">0</text>
+  <text class="tick" x="390" y="289" text-anchor="middle">500</text>
+  <text class="tick" x="490" y="289" text-anchor="middle">1000</text>
+  <text class="tick" x="590" y="289" text-anchor="middle">1500</text>
+  <text class="tick" x="690" y="289" text-anchor="end">2000 ms</text>
+  <text class="col-hdr" x="0" y="289">tool</text>
+  <text class="col-hdr" x="265" y="289" text-anchor="end">calls</text>
+  <text class="col-hdr" x="750" y="289" text-anchor="middle">err</text>
+</svg>
+    <figcaption>Public docs API, no auth. The fastest of the four.</figcaption>
+  </figure>
   <p>
-    A few things jump out. <strong>Context7 dominates the bandwidth</strong>
-    &mdash; <code>query-docs</code> answers run ~1.5&nbsp;s at the
-    median, which is sane for a doc-retrieval call but worth knowing
-    if a coding agent chains four of them per turn. <strong>GitHub's
-    <code>search_code</code> has a bimodal distribution</strong>:
-    median 270&nbsp;ms (cache hit), p95 3&nbsp;s (rate-limited
-    backoff). <strong>Learn is fastest</strong> across the board;
-    <strong>ADO Remote is the most consistent</strong> &mdash; tight
-    spread, predictable p95 around 1.4&nbsp;s.
+    <strong>Observation.</strong> Both doc-search tools sit tightly under
+    900&nbsp;ms p90 with zero errors &mdash; likely a CDN-fronted, cached
+    search index serving anonymous traffic.
   </p>
+  </section>
 
-  <p class="callout warn">
-    <strong>One-time warm-up cost.</strong>
-    First-contact <code>initialize</code> handshakes ranged from
-    104&nbsp;ms (Learn) to 333&nbsp;ms (ADO). They run once per VU per
-    session, so the dashboard counts them but they're not
-    steady-state &mdash; the <code>tools/call</code> rows are.
-  </p>
-
+  <!-- ===== GitHub ===== -->
+  <section class="server-card">
+  <figure class="perf-fig">
+<svg class="perf-svg" viewBox="0 0 800 370" role="img" aria-label="GitHubUser: handshake, tool calls, and cleanup performance from a 15-minute Azure Load Testing run.">
+  <text class="card-name" x="0" y="20">GitHubUser</text>
+  <text class="card-sub"  x="94" y="20">292 requests &middot; 3 errors &middot; 2 VUs &middot; api.githubcopilot.com/mcp</text>
+  <rect class="bar-avg" x="540" y="11" width="12" height="9"/><text class="legend-tx" x="558" y="20">avg</text>
+  <rect class="bar-p90-fill" x="595" y="11" width="20" height="9"/><text class="legend-tx" x="621" y="20">to p90</text>
+  <rect class="sect-bg" x="0" y="29" width="800" height="18"/>
+  <text class="sect-title" x="0" y="42">Handshake</text>
+  <text class="sect-hint"  x="800" y="42" text-anchor="end">once per VU</text>
+  <text class="tool" x="0" y="68">initialize</text>
+  <text class="n" x="265" y="68" text-anchor="end">2</text>
+  <rect class="bar-avg" x="290" y="57" width="30.6" height="14"/>
+  <rect class="bar-p90-fill" x="320.6" y="57" width="8.0" height="14"/>
+  <text class="barval" x="333.6" y="68">153<tspan class="p90num"> / 193</tspan></text>
+  <text class="err-ok" x="750" y="68" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="90">notifications/initialized</text>
+  <text class="n" x="265" y="90" text-anchor="end">2</text>
+  <rect class="bar-avg" x="290" y="79" width="7.6" height="14"/>
+  <text class="barval" x="302.8" y="90">38<tspan class="p90num"> / 39</tspan></text>
+  <text class="err-ok" x="750" y="90" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="112">tools/list</text>
+  <text class="n" x="265" y="112" text-anchor="end">2</text>
+  <rect class="bar-avg" x="290" y="101" width="13.0" height="14"/>
+  <text class="barval" x="308.2" y="112">65<tspan class="p90num"> / 66</tspan></text>
+  <text class="err-ok" x="750" y="112" text-anchor="middle">0</text>
+  <rect class="sect-bg" x="0" y="131" width="800" height="18"/>
+  <text class="sect-title" x="0" y="144">Tool calls</text>
+  <text class="sect-hint"  x="800" y="144" text-anchor="end">the workload</text>
+  <text class="tool" x="0" y="170">search_code</text>
+  <text class="n" x="265" y="170" text-anchor="end">84</text>
+  <rect class="bar-avg" x="290" y="159" width="110.8" height="14"/>
+  <rect class="bar-p90-fill" x="400.8" y="159" width="202.0" height="14"/>
+  <text class="barval" x="607.8" y="170">554<tspan class="p90num"> / 1564</tspan></text>
+  <text class="err-bad" x="750" y="170" text-anchor="middle">3</text>
+  <text class="tool" x="0" y="192">search_repositories</text>
+  <text class="n" x="265" y="192" text-anchor="end">75</text>
+  <rect class="bar-avg" x="290" y="181" width="234.0" height="14"/>
+  <rect class="bar-p90-fill" x="524.0" y="181" width="83.4" height="14"/>
+  <text class="barval" x="612.4" y="192">1170<tspan class="p90num"> / 1587</tspan></text>
+  <text class="err-ok" x="750" y="192" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="214">get_file_contents</text>
+  <text class="n" x="265" y="214" text-anchor="end">64</text>
+  <rect class="bar-avg" x="290" y="203" width="134.4" height="14"/>
+  <rect class="bar-p90-fill" x="424.4" y="203" width="46.4" height="14"/>
+  <text class="barval" x="475.8" y="214">672<tspan class="p90num"> / 904</tspan></text>
+  <text class="err-ok" x="750" y="214" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="236">list_issues</text>
+  <text class="n" x="265" y="236" text-anchor="end">31</text>
+  <rect class="bar-avg" x="290" y="225" width="122.4" height="14"/>
+  <rect class="bar-p90-fill" x="412.4" y="225" width="39.2" height="14"/>
+  <text class="barval" x="456.6" y="236">612<tspan class="p90num"> / 808</tspan></text>
+  <text class="err-ok" x="750" y="236" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="258">get_me</text>
+  <text class="n" x="265" y="258" text-anchor="end">30</text>
+  <rect class="bar-avg" x="290" y="247" width="35.6" height="14"/>
+  <rect class="bar-p90-fill" x="325.6" y="247" width="3.6" height="14"/>
+  <text class="barval" x="334.2" y="258">178<tspan class="p90num"> / 196</tspan></text>
+  <text class="err-ok" x="750" y="258" text-anchor="middle">0</text>
+  <rect class="sect-bg" x="0" y="277" width="800" height="18"/>
+  <text class="sect-title" x="0" y="290">Cleanup</text>
+  <text class="sect-hint"  x="800" y="290" text-anchor="end">DELETE on stop</text>
+  <text class="tool" x="0" y="316">DELETE /mcp</text>
+  <text class="n" x="265" y="316" text-anchor="end">2</text>
+  <rect class="bar-avg" x="290" y="305" width="9.2" height="14"/>
+  <text class="barval" x="304.4" y="316">46<tspan class="p90num"> / 47</tspan></text>
+  <text class="err-ok" x="750" y="316" text-anchor="middle">0</text>
+  <line class="axis" x1="290" y1="342" x2="690" y2="342"/>
+  <line class="grid" x1="390" y1="338" x2="390" y2="342"/>
+  <line class="grid" x1="490" y1="338" x2="490" y2="342"/>
+  <line class="grid" x1="590" y1="338" x2="590" y2="342"/>
+  <text class="tick" x="290" y="355">0</text>
+  <text class="tick" x="390" y="355" text-anchor="middle">500</text>
+  <text class="tick" x="490" y="355" text-anchor="middle">1000</text>
+  <text class="tick" x="590" y="355" text-anchor="middle">1500</text>
+  <text class="tick" x="690" y="355" text-anchor="end">2000 ms</text>
+  <text class="col-hdr" x="0" y="355">tool</text>
+  <text class="col-hdr" x="265" y="355" text-anchor="end">calls</text>
+  <text class="col-hdr" x="750" y="355" text-anchor="middle">err</text>
+</svg>
+    <figcaption>PAT-authenticated. <code>search_code</code> is bimodal &mdash; rate-limit backoff drives the p90.</figcaption>
+  </figure>
   <p>
-    Want the full picture &mdash; charts, error breakdown, VU ramp,
-    per-minute time series? It's all in the
-    <a href="sample-report/index.html">sample dashboard</a>.
+    <strong>Observation.</strong> <code>search_code</code> has a 554&nbsp;ms
+    average but a 1.56&nbsp;s p90 with 3 errors &mdash; suspected GitHub
+    API rate-limit throttling on the slow tail.
   </p>
+  </section>
 
+  <!-- ===== Context7 ===== -->
+  <section class="server-card">
+  <figure class="perf-fig">
+<svg class="perf-svg" viewBox="0 0 800 246" role="img" aria-label="Context7User: handshake and tool calls performance from a 15-minute Azure Load Testing run.">
+  <text class="card-name" x="0" y="20">Context7User</text>
+  <text class="card-sub"  x="110" y="20">617 requests &middot; 0 errors &middot; 5 VUs &middot; mcp.context7.com/mcp</text>
+  <rect class="bar-avg" x="540" y="11" width="12" height="9"/><text class="legend-tx" x="558" y="20">avg</text>
+  <rect class="bar-p90-fill" x="595" y="11" width="20" height="9"/><text class="legend-tx" x="621" y="20">to p90</text>
+  <rect class="sect-bg" x="0" y="29" width="800" height="18"/>
+  <text class="sect-title" x="0" y="42">Handshake</text>
+  <text class="sect-hint"  x="800" y="42" text-anchor="end">once per VU</text>
+  <text class="tool" x="0" y="68">initialize</text>
+  <text class="n" x="265" y="68" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="57" width="33.2" height="14"/>
+  <rect class="bar-p90-fill" x="323.2" y="57" width="4.2" height="14"/>
+  <text class="barval" x="332.4" y="68">166<tspan class="p90num"> / 187</tspan></text>
+  <text class="err-ok" x="750" y="68" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="90">notifications/initialized</text>
+  <text class="n" x="265" y="90" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="79" width="1.6" height="14"/>
+  <text class="barval" x="296.8" y="90">8<tspan class="p90num"> / 9</tspan></text>
+  <text class="err-ok" x="750" y="90" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="112">tools/list</text>
+  <text class="n" x="265" y="112" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="101" width="1.6" height="14"/>
+  <text class="barval" x="296.8" y="112">8<tspan class="p90num"> / 9</tspan></text>
+  <text class="err-ok" x="750" y="112" text-anchor="middle">0</text>
+  <rect class="sect-bg" x="0" y="131" width="800" height="18"/>
+  <text class="sect-title" x="0" y="144">Tool calls</text>
+  <text class="sect-hint"  x="800" y="144" text-anchor="end">the workload</text>
+  <text class="tool" x="0" y="170">query-docs</text>
+  <text class="n" x="265" y="170" text-anchor="end">441</text>
+  <rect class="bar-avg" x="290" y="159" width="283.0" height="14"/>
+  <rect class="bar-p90-fill" x="573.0" y="159" width="77.2" height="14"/>
+  <text class="barval" x="655.2" y="170">1415<tspan class="p90num"> / 1801</tspan></text>
+  <text class="err-ok" x="750" y="170" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="192">resolve-library-id</text>
+  <text class="n" x="265" y="192" text-anchor="end">161</text>
+  <rect class="bar-avg" x="290" y="181" width="239.6" height="14"/>
+  <rect class="bar-p90-fill" x="529.6" y="181" width="37.2" height="14"/>
+  <text class="barval" x="571.8" y="192">1198<tspan class="p90num"> / 1384</tspan></text>
+  <text class="err-ok" x="750" y="192" text-anchor="middle">0</text>
+  <line class="axis" x1="290" y1="218" x2="690" y2="218"/>
+  <line class="grid" x1="390" y1="214" x2="390" y2="218"/>
+  <line class="grid" x1="490" y1="214" x2="490" y2="218"/>
+  <line class="grid" x1="590" y1="214" x2="590" y2="218"/>
+  <text class="tick" x="290" y="231">0</text>
+  <text class="tick" x="390" y="231" text-anchor="middle">500</text>
+  <text class="tick" x="490" y="231" text-anchor="middle">1000</text>
+  <text class="tick" x="590" y="231" text-anchor="middle">1500</text>
+  <text class="tick" x="690" y="231" text-anchor="end">2000 ms</text>
+  <text class="col-hdr" x="0" y="231">tool</text>
+  <text class="col-hdr" x="265" y="231" text-anchor="end">calls</text>
+  <text class="col-hdr" x="750" y="231" text-anchor="middle">err</text>
+</svg>
+    <figcaption>Doc retrieval is genuinely heavy work. The slowest tier, but predictable.</figcaption>
+  </figure>
   <p>
-    Full source &mdash; including <code>_base.py</code>,
-    <code>multi.py</code>, and <code>azure-loadtest.yaml</code> &mdash;
-    at <a href="https://github.com/kroy92/azure-load-test-mcp-server">azure-load-test-mcp-server</a>.
+    <strong>Observation.</strong> Both tool calls sit above 1&nbsp;s
+    average &mdash; suspected synchronous semantic-search / embedding
+    lookup on every request, with no caching layer.
   </p>
+  </section>
+
+  <!-- ===== ADO Remote ===== -->
+  <section class="server-card">
+  <figure class="perf-fig">
+<svg class="perf-svg" viewBox="0 0 800 290" role="img" aria-label="ADOUser: handshake and tool calls performance from a 15-minute Azure Load Testing run.">
+  <text class="card-name" x="0" y="20">ADOUser</text>
+  <text class="card-sub"  x="70" y="20">649 requests &middot; 0 errors &middot; 5 VUs &middot; mcp.dev.azure.com/{org}</text>
+  <rect class="bar-avg" x="540" y="11" width="12" height="9"/><text class="legend-tx" x="558" y="20">avg</text>
+  <rect class="bar-p90-fill" x="595" y="11" width="20" height="9"/><text class="legend-tx" x="621" y="20">to p90</text>
+  <rect class="sect-bg" x="0" y="29" width="800" height="18"/>
+  <text class="sect-title" x="0" y="42">Handshake</text>
+  <text class="sect-hint"  x="800" y="42" text-anchor="end">once per VU</text>
+  <text class="tool" x="0" y="68">initialize</text>
+  <text class="n" x="265" y="68" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="57" width="67.0" height="14"/>
+  <rect class="bar-p90-fill" x="357.0" y="57" width="8.8" height="14"/>
+  <text class="barval" x="370.8" y="68">335<tspan class="p90num"> / 379</tspan></text>
+  <text class="err-ok" x="750" y="68" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="90">notifications/initialized</text>
+  <text class="n" x="265" y="90" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="79" width="38.2" height="14"/>
+  <rect class="bar-p90-fill" x="328.2" y="79" width="26.8" height="14"/>
+  <text class="barval" x="360.0" y="90">191<tspan class="p90num"> / 325</tspan></text>
+  <text class="err-ok" x="750" y="90" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="112">tools/list</text>
+  <text class="n" x="265" y="112" text-anchor="end">5</text>
+  <rect class="bar-avg" x="290" y="101" width="29.8" height="14"/>
+  <rect class="bar-p90-fill" x="319.8" y="101" width="8.2" height="14"/>
+  <text class="barval" x="333.0" y="112">149<tspan class="p90num"> / 190</tspan></text>
+  <text class="err-ok" x="750" y="112" text-anchor="middle">0</text>
+  <rect class="sect-bg" x="0" y="131" width="800" height="18"/>
+  <text class="sect-title" x="0" y="144">Tool calls</text>
+  <text class="sect-hint"  x="800" y="144" text-anchor="end">the workload</text>
+  <text class="tool" x="0" y="170">wit_work_item</text>
+  <text class="n" x="265" y="170" text-anchor="end">328</text>
+  <rect class="bar-avg" x="290" y="159" width="134.4" height="14"/>
+  <rect class="bar-p90-fill" x="424.4" y="159" width="66.6" height="14"/>
+  <text class="barval" x="496.0" y="170">672<tspan class="p90num"> / 1005</tspan></text>
+  <text class="err-ok" x="750" y="170" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="192">search_workitem</text>
+  <text class="n" x="265" y="192" text-anchor="end">125</text>
+  <rect class="bar-avg" x="290" y="181" width="190.4" height="14"/>
+  <rect class="bar-p90-fill" x="480.4" y="181" width="28.2" height="14"/>
+  <text class="barval" x="513.6" y="192">952<tspan class="p90num"> / 1093</tspan></text>
+  <text class="err-ok" x="750" y="192" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="214">repo_repository</text>
+  <text class="n" x="265" y="214" text-anchor="end">109</text>
+  <rect class="bar-avg" x="290" y="203" width="132.6" height="14"/>
+  <rect class="bar-p90-fill" x="422.6" y="203" width="70.2" height="14"/>
+  <text class="barval" x="497.8" y="214">663<tspan class="p90num"> / 1014</tspan></text>
+  <text class="err-ok" x="750" y="214" text-anchor="middle">0</text>
+  <text class="tool" x="0" y="236">pipelines_build</text>
+  <text class="n" x="265" y="236" text-anchor="end">72</text>
+  <rect class="bar-avg" x="290" y="225" width="222.6" height="14"/>
+  <rect class="bar-p90-fill" x="512.6" y="225" width="89.6" height="14"/>
+  <text class="barval" x="607.2" y="236">1113<tspan class="p90num"> / 1561</tspan></text>
+  <text class="err-ok" x="750" y="236" text-anchor="middle">0</text>
+  <line class="axis" x1="290" y1="262" x2="690" y2="262"/>
+  <line class="grid" x1="390" y1="258" x2="390" y2="262"/>
+  <line class="grid" x1="490" y1="258" x2="490" y2="262"/>
+  <line class="grid" x1="590" y1="258" x2="590" y2="262"/>
+  <text class="tick" x="290" y="275">0</text>
+  <text class="tick" x="390" y="275" text-anchor="middle">500</text>
+  <text class="tick" x="490" y="275" text-anchor="middle">1000</text>
+  <text class="tick" x="590" y="275" text-anchor="middle">1500</text>
+  <text class="tick" x="690" y="275" text-anchor="end">2000 ms</text>
+  <text class="col-hdr" x="0" y="275">tool</text>
+  <text class="col-hdr" x="265" y="275" text-anchor="end">calls</text>
+  <text class="col-hdr" x="750" y="275" text-anchor="middle">err</text>
+</svg>
+    <figcaption>Entra-authenticated, per-request bearer. The most consistent server &mdash; tight p90 spread.</figcaption>
+  </figure>
+  <p>
+    <strong>Observation.</strong> Handshake <code>initialize</code> is
+    335&nbsp;ms &mdash; the heaviest of the four, suspected to be Entra
+    bearer-token validation on every new session.
+  </p>
+  </section>
 
 </article>
 
 <footer class="post">
-  Source code: <a href="https://github.com/kroy92/azure-load-test-mcp-server">azure-load-test-mcp-server</a>
-  &middot; Built with Locust 2.43, Python 3.13, uv.
+  Built with Locust 2.43, Python 3.13, uv.
 </footer>
 
 </body>

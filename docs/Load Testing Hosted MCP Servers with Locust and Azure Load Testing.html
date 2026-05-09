@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Load testing hosted MCP servers with Locust</title>
-<meta name="description" content="A portable Python harness for the Streamable HTTP transport, with four real servers as worked examples.">
+<title>Load Testing Hosted MCP Servers with Locust and Azure Load Testing</title>
+<meta name="description" content="A technical guide and white paper on modeling MCP tool traffic with a portable Locust harness that runs locally and in Azure Load Testing across Microsoft Learn, GitHub, Context7, and Azure DevOps MCP servers.">
 
 <style>
   :root {
@@ -14,9 +14,9 @@
     --bg: #fdfdfc;
     --bg-soft: #f5f3ef;
     --rule: #e7e3dc;
-    --accent: #2b6cb0;       /* steady blue */
+    --accent: #2b6cb0;
     --accent-soft: #ebf3fb;
-    --warn: #b25a00;         /* amber for callouts */
+    --warn: #b25a00;
     --warn-soft: #fff4e5;
     --good: #2f7a3c;
     --good-soft: #e9f5ec;
@@ -27,7 +27,6 @@
   }
 
   * { box-sizing: border-box; }
-
   html { -webkit-text-size-adjust: 100%; }
 
   body {
@@ -39,48 +38,112 @@
     padding: 0 20px 80px;
   }
 
-  /* ---------- header ---------- */
-  header.post {
+  /* ---------- cover / title block ---------- */
+  .cover {
     max-width: var(--max);
     margin: 64px auto 32px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--rule);
+    padding-bottom: 28px;
+    border-bottom: 2px solid var(--fg);
   }
-  header.post .eyebrow {
+  .cover .doctype {
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 12px;
-    color: var(--fg-mute);
-    font-weight: 600;
-    margin-bottom: 12px;
+    letter-spacing: 0.16em;
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 14px;
   }
-  header.post h1 {
-    font-size: 30px;
+  .cover h1 {
+    font-size: 32px;
     line-height: 1.2;
     font-weight: 700;
-    margin: 0 0 14px;
+    margin: 0 0 12px;
     letter-spacing: -0.01em;
   }
-  header.post .subtitle {
-    font-size: 16px;
+  .cover .subtitle {
+    font-size: 17px;
     line-height: 1.5;
     color: var(--fg-soft);
     font-weight: 400;
-    margin: 0 0 20px;
+    margin: 0 0 28px;
   }
-  header.post .meta {
-    font-size: 14px;
+  .cover .meta-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    column-gap: 24px;
+    row-gap: 6px;
+    font-size: 13px;
+    color: var(--fg-soft);
+  }
+  .cover .meta-grid dt {
+    font-weight: 600;
     color: var(--fg-mute);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    align-items: center;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 11px;
+    align-self: center;
   }
-  header.post .meta .dot::before {
-    content: "·";
-    margin-right: 14px;
-    color: var(--rule);
+  .cover .meta-grid dd { margin: 0; }
+
+  /* ---------- abstract block ---------- */
+  .abstract {
+    max-width: var(--max);
+    margin: 0 auto 36px;
+    background: var(--bg-soft);
+    border-left: 3px solid var(--accent);
+    padding: 22px 26px;
+    border-radius: 0 6px 6px 0;
   }
+  .abstract h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0 0 12px;
+    font-weight: 700;
+  }
+  .abstract p { margin: 0 0 0.9em; }
+  .abstract p:last-child { margin-bottom: 0; }
+  .abstract .keywords {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--fg-mute);
+  }
+  .abstract .keywords strong {
+    color: var(--fg);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 11px;
+    margin-right: 8px;
+  }
+
+  /* ---------- TOC ---------- */
+  nav.toc {
+    max-width: var(--max);
+    margin: 0 auto 40px;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 20px 26px;
+    font-size: 14px;
+  }
+  nav.toc h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-mute);
+    margin: 0 0 12px;
+    font-weight: 700;
+  }
+  nav.toc ol { margin: 0; padding-left: 24px; }
+  nav.toc li { margin-bottom: 5px; }
+  nav.toc a {
+    color: var(--fg);
+    text-decoration: none;
+  }
+  nav.toc a:hover { text-decoration: underline; color: var(--accent); }
 
   /* ---------- body ---------- */
   article {
@@ -91,13 +154,15 @@
   article h2 {
     font-size: 22px;
     line-height: 1.3;
-    margin: 48px 0 14px;
+    margin: 56px 0 16px;
     letter-spacing: -0.005em;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
   }
   article h2 .num {
-    color: var(--fg-mute);
-    font-weight: 500;
-    margin-right: 10px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-right: 12px;
     font-variant-numeric: tabular-nums;
   }
   article h3 {
@@ -150,7 +215,7 @@
     width: 100%;
     border-collapse: collapse;
     margin: 0 0 1.4em;
-    font-size: 15px;
+    font-size: 14px;
   }
   article th, article td {
     text-align: left;
@@ -171,56 +236,14 @@
     padding: 14px 18px;
     border-radius: 0 6px 6px 0;
     margin: 0 0 1.4em;
-    font-size: 15.5px;
+    font-size: 15px;
   }
   .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
   .callout.good { border-color: var(--good); background: var(--good-soft); }
   .callout p:last-child { margin-bottom: 0; }
   .callout strong { display: block; margin-bottom: 4px; }
 
-  /* TOC */
-  nav.toc {
-    background: var(--bg-soft);
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    padding: 18px 22px;
-    font-size: 15px;
-    margin: 0 0 36px;
-  }
-  nav.toc strong {
-    display: block;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-mute);
-    margin-bottom: 8px;
-  }
-  nav.toc ol { margin: 0; padding-left: 22px; }
-  nav.toc li { margin-bottom: 4px; }
-  nav.toc a { text-decoration: none; }
-  nav.toc a:hover { text-decoration: underline; }
-
-  /* footer */
-  footer.post {
-    max-width: var(--max);
-    margin: 64px auto 0;
-    padding-top: 24px;
-    border-top: 1px solid var(--rule);
-    font-size: 14px;
-    color: var(--fg-mute);
-  }
-
-  /* placeholder section markers while drafting */
-  .draft {
-    color: var(--fg-mute);
-    font-style: italic;
-    border: 1px dashed var(--rule);
-    padding: 14px 18px;
-    border-radius: 6px;
-    background: #fafaf8;
-  }
-
-  /* figures and diagrams */
+  /* figures */
   figure.diagram {
     margin: 24px 0 28px;
     text-align: center;
@@ -235,34 +258,156 @@
     max-width: 100%;
   }
   figure.diagram figcaption {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--fg-mute);
-    margin-top: 8px;
+    margin-top: 10px;
     text-align: center;
     font-style: italic;
     line-height: 1.5;
   }
-  /* loop list — slightly more breathing room */
+  figure.diagram figcaption .figlabel {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--fg);
+    margin-right: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 11px;
+  }
+
   ol.loop-list { margin: 4px 0 1.4em; }
   ol.loop-list li { margin-bottom: 10px; }
 
+  /* references */
+  .references {
+    max-width: var(--max);
+    margin: 64px auto 0;
+    padding-top: 24px;
+    border-top: 2px solid var(--fg);
+  }
+  .references h2 {
+    font-size: 18px;
+    margin: 0 0 16px;
+    border-bottom: 0;
+  }
+  .references ol {
+    padding-left: 28px;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .references li { margin-bottom: 8px; }
+
+  /* appendix */
+  .appendix {
+    max-width: var(--max);
+    margin: 56px auto 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+  }
+  .appendix h2 {
+    font-size: 18px;
+    margin: 0 0 16px;
+    border-bottom: 0;
+  }
+
+  /* footer */
+  footer.post {
+    max-width: var(--max);
+    margin: 56px auto 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--fg-mute);
+  }
+
   @media (max-width: 600px) {
-    header.post h1 { font-size: 30px; }
-    header.post .subtitle { font-size: 17px; }
-    article h2 { font-size: 22px; }
-    article pre { font-size: 13px; padding: 14px; }
+    .cover h1 { font-size: 26px; }
+    article h2 { font-size: 20px; }
+    article pre { font-size: 12.5px; padding: 12px; }
   }
 </style>
 </head>
 <body>
 
-<header class="post">
-  <h1>Load testing hosted MCP servers with Locust</h1>
-</header>
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="doctype">White Paper · Technical Guide</div>
+  <h1>Load Testing Hosted MCP Servers with Locust and Azure Load Testing</h1>
+  <p class="subtitle">Model agent-shaped traffic against Streamable HTTP MCP servers with a portable Python harness &mdash; validated across four production servers.</p>
+  <dl class="meta-grid">
+    <dt>Author</dt>           <dd>Krishna Roy</dd>
+    <dt>Affiliation</dt>      <dd>Microsoft — GDC AIBS Americas</dd>
+    <dt>Document Version</dt> <dd>1.0</dd>
+    <dt>Date</dt>             <dd>9 May 2026</dd>
+    <dt>Source Code</dt>      <dd><a href="https://github.com/kroy92/azure-load-test-mcp-server" target="_blank" rel="noopener">github.com/kroy92/azure-load-test-mcp-server</a></dd>
+  </dl>
+</div>
+
+<!-- ============ ABSTRACT ============ -->
+<section class="abstract">
+  <h2>Abstract</h2>
+  <p>
+    The Model Context Protocol (MCP) has emerged as the common interface
+    by which AI agents invoke tools, read resources, and reuse prompts
+    exposed by external services. As MCP servers move from local
+    subprocesses to hosted, network-reachable endpoints, their
+    operational behaviour under concurrent load becomes a first-class
+    engineering concern — yet no off-the-shelf load-testing tooling
+    speaks the protocol natively.
+  </p>
+  <p>
+    This guide presents a small, portable Python harness, built on
+    Locust, that exercises the full MCP life cycle over the Streamable
+    HTTP transport: <code>initialize</code>, <code>notifications/initialized</code>,
+    <code>tools/list</code>, repeated <code>tools/call</code>, and a
+    polite <code>DELETE</code> on shutdown. The harness handles both
+    response modes (single-shot <code>application/json</code> and framed
+    <code>text/event-stream</code>), supports stateful and stateless
+    servers from a single base class, and accommodates three common
+    authentication patterns (no auth, static bearer, dynamic per-request
+    token).
+  </p>
+  <p>
+    The design is validated by a fifteen-minute, multi-server run in
+    Azure Load Testing against four production endpoints — Microsoft
+    Learn, GitHub, Context7, and the Azure DevOps remote MCP — driven
+    from a single Locust process. The run produced 2,293 requests with
+    three failures (0.13%) and surfaced distinct latency signatures per
+    server that map cleanly to their backing implementations. The same
+    project files run unchanged locally and in the cloud; secrets are
+    resolved through Key Vault via a managed identity at runtime.
+  </p>
+  <p class="keywords">
+    <strong>Keywords</strong> Model Context Protocol, MCP, Streamable
+    HTTP, load testing, Locust, Azure Load Testing, Server-Sent Events,
+    JSON-RPC, agent tooling, performance engineering.
+  </p>
+</section>
+
+<!-- ============ TOC ============ -->
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#introduction">Introduction</a></li>
+    <li><a href="#background">Background — The MCP Life Cycle</a></li>
+    <li><a href="#methodology">Methodology — A First Locust Script</a></li>
+    <li><a href="#auth">Authentication Patterns</a></li>
+    <li><a href="#framework">Framework Architecture</a></li>
+    <li><a href="#deployment">Deployment — Local and Cloud Execution</a></li>
+    <li><a href="#workload">Experimental Setup</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#discussion">Discussion</a></li>
+    <li><a href="#conclusion">Conclusion</a></li>
+    <li><a href="#references">References</a></li>
+    <li><a href="#appendix">Appendix A — Code Availability</a></li>
+  </ol>
+</nav>
 
 <article>
 
-  <!-- ============ INTRO ============ -->
+  <!-- ============ 1. INTRODUCTION ============ -->
+  <h2 id="introduction"><span class="num">1.</span>Introduction</h2>
+
   <p>
     MCP servers are everywhere. Every team is exposing the tools, data,
     and actions their product can perform so an AI agent can reach in
@@ -280,6 +425,16 @@
     context, and <strong>prompts</strong> it can reuse. That small,
     shared vocabulary is what lets one agent reach across many servers
     &mdash; docs, code, your product &mdash; without custom glue for each one.
+  </p>
+
+  <p>
+    As these servers move from <code>stdio</code> subprocesses to hosted
+    HTTP endpoints serving many tenants, their concurrency profile,
+    latency tail, and failure modes under load become operational
+    questions teams must answer before production. This guide
+    contributes a minimal, transport-faithful, portable load-testing
+    harness for hosted MCP servers and demonstrates its use against
+    four production endpoints.
   </p>
 
   <figure class="diagram">
@@ -312,7 +467,6 @@
         </linearGradient>
       </defs>
 
-      <!-- ===== AI AGENT (left) ===== -->
       <g>
         <rect x="20" y="170" width="370" height="240" rx="16"
               fill="url(#agentFill)" stroke="#cfc9bd" stroke-width="1.5"/>
@@ -320,8 +474,6 @@
               font-size="13" font-weight="700" fill="#1a1a1a"
               letter-spacing="0.08em">AI AGENT (LLM IN A LOOP)</text>
 
-        <!-- 4 loop nodes inside the agent box, 2x2 -->
-        <!-- Perceive (top-left) -->
         <g transform="translate(50 220)">
           <rect width="140" height="64" rx="8"
                 fill="url(#loopBoxFill)" stroke="#cfc9bd"/>
@@ -330,7 +482,6 @@
           <text x="70" y="48" text-anchor="middle" font-size="11"
                 fill="#4a4a4a">read the question</text>
         </g>
-        <!-- Reason (top-right) -->
         <g transform="translate(220 220)">
           <rect width="140" height="64" rx="8"
                 fill="url(#loopBoxFill)" stroke="#cfc9bd"/>
@@ -339,7 +490,6 @@
           <text x="70" y="48" text-anchor="middle" font-size="11"
                 fill="#4a4a4a">pick which tool to call</text>
         </g>
-        <!-- Remember (bottom-left) -->
         <g transform="translate(50 320)">
           <rect width="140" height="64" rx="8"
                 fill="url(#loopBoxFill)" stroke="#cfc9bd"/>
@@ -348,7 +498,6 @@
           <text x="70" y="48" text-anchor="middle" font-size="11"
                 fill="#4a4a4a">keep context for next turn</text>
         </g>
-        <!-- Act (bottom-right, highlighted) -->
         <g transform="translate(220 320)">
           <rect width="140" height="64" rx="8"
                 fill="#dceaf6" stroke="#5586b3" stroke-width="1.5"/>
@@ -358,7 +507,6 @@
                 fill="#1f3b5c">call a tool on MCP</text>
         </g>
 
-        <!-- loop arrows: 1→2→3→4→1 -->
         <path d="M 190,252 L 220,252" fill="none" stroke="#6b6b6b"
               stroke-width="1.4" marker-end="url(#arr)"/>
         <path d="M 290,284 L 290,320" fill="none" stroke="#6b6b6b"
@@ -369,13 +517,11 @@
               stroke-width="1.4" marker-end="url(#arr)"/>
       </g>
 
-      <!-- ===== Arrow from Act → MCP layer ===== -->
       <path d="M 360,352 L 430,352" fill="none" stroke="#5586b3"
             stroke-width="2" marker-end="url(#arrBlue)"/>
       <text x="395" y="344" text-anchor="middle" font-size="11"
             fill="#5586b3" font-style="italic">tools/call</text>
 
-      <!-- ===== MCP layer (vertical bar) ===== -->
       <g>
         <rect x="440" y="40" width="44" height="500" rx="8"
               fill="#1f3b5c" stroke="#1f3b5c"/>
@@ -385,7 +531,6 @@
               transform="rotate(-90 462 290)">MCP · Streamable HTTP</text>
       </g>
 
-      <!-- ===== fan-out arrows from MCP bar to each server (clean, one per card) ===== -->
       <path d="M 484,80  L 540,80"  fill="none" stroke="#5586b3"
             stroke-width="1.4" marker-end="url(#arrBlue)"/>
       <path d="M 484,200 L 540,200" fill="none" stroke="#5586b3"
@@ -395,8 +540,6 @@
       <path d="M 484,470 L 540,470" fill="none" stroke="#5586b3"
             stroke-width="1.4" marker-end="url(#arrBlue)"/>
 
-      <!-- ===== Four MCP servers stacked on the right ===== -->
-      <!-- MS Learn -->
       <g transform="translate(550 50)">
         <rect width="470" height="60" rx="10"
               fill="url(#mcpFill)" stroke="#9ec1e3" stroke-width="1.2"/>
@@ -405,7 +548,6 @@
         <text x="454" y="24" text-anchor="end" font-size="11" font-style="italic" fill="#4a4a4a">2 tools · public, no auth</text>
       </g>
 
-      <!-- GitHub -->
       <g transform="translate(550 170)">
         <rect width="470" height="80" rx="10"
               fill="url(#mcpFill)" stroke="#9ec1e3" stroke-width="1.2"/>
@@ -415,7 +557,6 @@
         <text x="454" y="24" text-anchor="end" font-size="11" font-style="italic" fill="#4a4a4a">~30 tools · PAT bearer</text>
       </g>
 
-      <!-- Context7 -->
       <g transform="translate(550 330)">
         <rect width="470" height="60" rx="10"
               fill="url(#mcpFill)" stroke="#9ec1e3" stroke-width="1.2"/>
@@ -424,7 +565,6 @@
         <text x="454" y="24" text-anchor="end" font-size="11" font-style="italic" fill="#4a4a4a">2 tools · API key</text>
       </g>
 
-      <!-- Your CUSTOM MCP (highlighted) -->
       <g transform="translate(550 440)">
         <rect width="470" height="60" rx="10"
               fill="url(#customFill)" stroke="#d49b4a" stroke-width="1.5"/>
@@ -433,37 +573,51 @@
         <text x="454" y="24" text-anchor="end" font-size="11" font-style="italic" fill="#7a4a00">your tools · your auth</text>
       </g>
     </svg>
+    <figcaption><span class="figlabel">Figure 1.</span> An AI agent runs a four-step loop and reaches multiple hosted MCP servers through a common Streamable HTTP transport.</figcaption>
   </figure>
 
-  <!-- ============ SECTION 1 ============ -->
-  <h2 id="approach"><span class="num">1.</span>Approach</h2>
+  <h3>1.1 Scope and Contributions</h3>
+  <p>
+    This guide restricts its attention to the <em>tools</em> primitive
+    and the <em>Streamable HTTP</em> transport, since these are the
+    only combination that produces interesting load-testing behaviour.
+    The contributions are: (i) a faithful, life-cycle-complete Locust
+    user class for MCP; (ii) a clean separation between stateful and
+    stateless server shapes; (iii) a small auth-pattern taxonomy; and
+    (iv) an empirical baseline across four real, production-grade
+    endpoints.
+  </p>
 
-  <h3>Hosted means HTTP, not stdio</h3>
+  <!-- ============ 2. BACKGROUND ============ -->
+  <h2 id="background"><span class="num">2.</span>Background — The MCP Life Cycle</h2>
+
+  <h3>2.1 Streamable HTTP is the load-testable transport</h3>
   <p>
     MCP defines two transports: <strong>stdio</strong>, where the agent
     spawns the server as a local subprocess and pipes JSON-RPC over its
     stdin and stdout, and <strong>Streamable HTTP</strong>, where the
-    server lives on the network. This post focuses on Streamable HTTP
-    because that's the only transport with anything to load test &mdash;
-    a stdio server has no socket, no concurrency of its own, and is
-    bounded by the single agent process that launched it.
+    server lives on the network. This guide focuses on Streamable HTTP
+    because it exposes a network endpoint that Locust can exercise. The
+    stdio transport can still be stress-tested locally, but it does not
+    map naturally to network load testing or provide an independent HTTP
+    surface for this harness to test.
   </p>
 
-  <h3>The MCP life cycle</h3>
+  <h3>2.2 The MCP life cycle</h3>
   <p>
     Every agent-to-server conversation follows the same formal flow: how
     the connection opens, how messages are exchanged while it's alive,
     and how it shuts down cleanly. That flow is the
-    <strong>MCP life cycle</strong>, and our load test has to mimic it
-    end to end &mdash; otherwise we're not testing what a real agent
-    actually puts on the wire.
+    <strong>MCP life cycle</strong>, and a faithful load test has to
+    mimic it end to end &mdash; otherwise it is not testing what a real
+    agent actually puts on the wire.
   </p>
 
-  <h3>Phase 1 &mdash; The handshake</h3>
+  <h3>2.3 Phase 1 &mdash; The handshake</h3>
   <p>
-    Throughout the rest of this post the server is Microsoft Learn,
-    hosted at <code>https://learn.microsoft.com/api/mcp</code>. Every
-    arrow you see in the diagrams is a <code>POST</code> to that URL.
+    Throughout the rest of this guide the example server is Microsoft
+    Learn, hosted at <code>https://learn.microsoft.com/api/mcp</code>.
+    Every arrow in the following diagrams is a <code>POST</code> to that URL.
   </p>
   <p>
     Before the agent can call a single tool, it has to introduce itself
@@ -481,7 +635,6 @@
           <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
         </marker>
       </defs>
-
       <style>
         .actor      { fill: #1f3b5c; }
         .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
@@ -494,61 +647,54 @@
         .ok-box     { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1; }
         .ok-text    { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #2f7a3c; }
       </style>
-
-      <!-- Actor headers -->
       <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
       <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
-
-      <!-- Lifelines -->
       <line class="lifeline" x1="120" y1="54"  x2="120" y2="430"/>
       <line class="lifeline" x1="600" y1="54"  x2="600" y2="430"/>
-
-      <!-- 1. initialize request -->
       <text class="label" x="130" y="84">POST /mcp</text>
       <text class="body"  x="130" y="102">{"id":1,"method":"initialize",</text>
-      <text class="body"  x="130" y="118">&#160;"params":{"protocolVersion":"2025-03-26",</text>
+      <text class="body"  x="130" y="118">&#160;"params":{"protocolVersion":"2025-06-18",</text>
       <text class="body"  x="130" y="134">&#160;&#160;"clientInfo":{"name":"locust-client"},</text>
       <text class="body"  x="130" y="150">&#160;&#160;"capabilities":{...}}}</text>
       <line class="msg" x1="120" y1="162" x2="600" y2="162" marker-end="url(#hs-arrow)"/>
-
-      <!-- 2. initialize response -->
       <text class="label" x="590" y="190" text-anchor="end">200 OK · text/event-stream</text>
       <text class="label" x="590" y="208" text-anchor="end">Mcp-Session-Id: f41e932c…</text>
       <text class="body"  x="590" y="226" text-anchor="end">data: {"id":1,"result":{</text>
       <text class="body"  x="590" y="242" text-anchor="end">&#160;"serverInfo":{"name":"microsoft.docs.mcp"},</text>
       <text class="body"  x="590" y="258" text-anchor="end">&#160;"capabilities":{...}}}</text>
       <line class="msg-back" x1="600" y1="270" x2="120" y2="270" marker-end="url(#hs-arrow-back)"/>
-
-      <!-- 3. notifications/initialized -->
       <text class="label" x="130" y="298">POST /mcp  +  Mcp-Session-Id: f41e932c…</text>
       <text class="body"  x="130" y="316">{"method":"notifications/initialized"}</text>
       <text class="note"  x="130" y="334">(fire-and-forget — server replies 202, no body)</text>
       <line class="msg" x1="120" y1="346" x2="600" y2="346" marker-end="url(#hs-arrow)"/>
-
-      <!-- Done banner -->
       <rect class="ok-box" x="120" y="386" width="480" height="34" rx="4"/>
       <text class="ok-text" x="360" y="408" text-anchor="middle">✓ both sides aligned · session id minted · ready for tools/call</text>
     </svg>
+    <figcaption><span class="figlabel">Figure 2.</span> The three-message handshake that opens an MCP session.</figcaption>
   </figure>
 
   <p>
-    The session id is the only thing the agent has to hold onto. Every
-    subsequent <code>tools/call</code> rides on the same
-    <code>Mcp-Session-Id</code> header until the connection ends &mdash;
-    which is exactly what a Locust virtual user has to do too.
+    For stateful servers, the session id is the value the agent must
+    preserve. Every subsequent <code>tools/call</code> rides on the
+    same <code>Mcp-Session-Id</code> header until the connection ends
+    &mdash; which is exactly what a Locust virtual user has to do too.
   </p>
   <p>
     One caveat: <strong>not every MCP server mints a session</strong>.
-    Stateless servers (GitHub's hosted MCP, Context7, plenty of
-    read-only wrappers) skip the <code>Mcp-Session-Id</code> header
-    entirely &mdash; the handshake still happens, but every
-    <code>tools/call</code> after it is a standalone POST. Both shapes
-    are valid; the client just has to handle either.
+    Stateless servers such as Context7 and the Azure DevOps Remote MCP
+    skip the <code>Mcp-Session-Id</code> header entirely &mdash; the
+    handshake still happens, but later <code>tools/call</code>
+    requests are standalone POSTs and the harness skips DELETE
+    cleanup. GitHub is bearer-authenticated and session-bearing in
+    this harness; Microsoft Learn is shown with a session id because
+    that was the behaviour observed in the demo run reported here.
+    Verify current service behaviour before treating it as a permanent
+    contract.
   </p>
 
-  <h3>Phase 2 &mdash; Discover what the server can do</h3>
+  <h3>2.4 Phase 2 &mdash; Discover available tools</h3>
   <p>
     Once the handshake is done, the agent doesn't yet know what tools
     the server actually exposes. It asks. The answer is the menu the
@@ -565,7 +711,6 @@
           <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
         </marker>
       </defs>
-
       <style>
         .actor      { fill: #1f3b5c; }
         .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
@@ -578,23 +723,15 @@
         .ok-box     { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1; }
         .ok-text    { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #2f7a3c; }
       </style>
-
-      <!-- Actor headers -->
       <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
       <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
-
-      <!-- Lifelines -->
       <line class="lifeline" x1="120" y1="54"  x2="120" y2="520"/>
       <line class="lifeline" x1="600" y1="54"  x2="600" y2="520"/>
-
-      <!-- 1. tools/list request -->
       <text class="label" x="130" y="84">POST /mcp  +  Mcp-Session-Id: f41e932c…</text>
       <text class="body"  x="130" y="102">{"id":2,"method":"tools/list"}</text>
       <line class="msg" x1="120" y1="116" x2="600" y2="116" marker-end="url(#tl-arrow)"/>
-
-      <!-- 2. tools/list response (full payload — only two tools) -->
       <text class="label" x="590" y="148" text-anchor="end">200 OK · text/event-stream</text>
       <text class="body"  x="590" y="166" text-anchor="end">data: {"id":2,"result":{"tools":[</text>
       <text class="body"  x="590" y="182" text-anchor="end">&#160;{</text>
@@ -613,29 +750,28 @@
       <text class="body"  x="590" y="390" text-anchor="end">&#160;}</text>
       <text class="body"  x="590" y="406" text-anchor="end">]}}</text>
       <line class="msg-back" x1="600" y1="422" x2="120" y2="422" marker-end="url(#tl-arrow-back)"/>
-
-      <!-- Done banner -->
       <rect class="ok-box" x="120" y="472" width="480" height="34" rx="4"/>
       <text class="ok-text" x="360" y="494" text-anchor="middle">✓ agent now knows the menu · ready to call either tool by name</text>
     </svg>
+    <figcaption><span class="figlabel">Figure 3.</span> A <code>tools/list</code> exchange returns the menu of callable tools.</figcaption>
   </figure>
 
   <p>
     The response is a flat list of tool descriptors &mdash; name,
     human-readable description, and a JSON Schema for the arguments. A
     real agent feeds this list straight into the LLM's system prompt so
-    the model knows what it can call. A load test doesn't need the LLM
+    the model knows what it can call. A load test does not need the LLM
     in the loop, but it still needs to call <code>tools/list</code>
-    at least once per session: it's how the harness learns the real tool
-    names instead of hard-coding them.
+    at least once per session: it is how the harness learns the real
+    tool names instead of hard-coding them.
   </p>
 
-  <h3>Phase 3 &mdash; Call a tool</h3>
+  <h3>2.5 Phase 3 &mdash; Call a tool</h3>
   <p>
-    This is the request the entire load test exists to measure. The
-    agent picks a tool from the menu, fills in the arguments, and POSTs
-    a <code>tools/call</code>. The reply comes back in one of two
-    shapes &mdash; the client asks for both with
+    The <code>tools/call</code> request is the primary measurement
+    target. The agent picks a tool from the menu, fills in the
+    arguments, and POSTs a <code>tools/call</code>. The response comes
+    back in one of two shapes &mdash; the client asks for both with
     <code>Accept: application/json, text/event-stream</code> and the
     server picks one per request.
   </p>
@@ -657,22 +793,30 @@
         .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
         .body       { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #4a4a4a; }
       </style>
-
       <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
       <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
-
       <line class="lifeline" x1="120" y1="54" x2="120" y2="180"/>
       <line class="lifeline" x1="600" y1="54" x2="600" y2="180"/>
-
       <text class="label" x="130" y="84">POST /mcp  +  Mcp-Session-Id: f41e932c…</text>
       <text class="body"  x="130" y="102">{"id":3,"method":"tools/call",</text>
       <text class="body"  x="130" y="118">&#160;"params":{"name":"microsoft_docs_search",</text>
       <text class="body"  x="130" y="134">&#160;&#160;"arguments":{"query":"locust load testing"}}}</text>
       <line class="msg" x1="120" y1="148" x2="600" y2="148" marker-end="url(#tc-arrow)"/>
     </svg>
+    <figcaption><span class="figlabel">Figure 4.</span> A <code>tools/call</code> request — the request the load test exists to measure.</figcaption>
   </figure>
+
+  <p>
+    The client asks for both response shapes with a single
+    <code>Accept: application/json, text/event-stream</code> header,
+    and the server picks whichever it prefers per request. The harness
+    therefore must check <code>Content-Type</code> first and choose
+    how to read the body &mdash; calling <code>.json()</code> on an
+    SSE response will throw, and assuming a single mode means the
+    harness will work against some servers and fail against others.
+  </p>
 
   <p><strong>Mode A &mdash; <code>application/json</code>.</strong> The body <em>is</em> the JSON-RPC payload. One response, no wrapping.</p>
 
@@ -693,18 +837,13 @@
         .body-text  { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
         .body-tag   { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #b25a00; letter-spacing: 0.06em; }
       </style>
-
       <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
       <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
-
       <line class="lifeline" x1="120" y1="54" x2="120" y2="290"/>
       <line class="lifeline" x1="600" y1="54" x2="600" y2="290"/>
-
       <text class="label" x="590" y="84" text-anchor="end">200 OK · Content-Type: application/json</text>
-
-      <!-- Single body block: tag sits on the box border -->
       <rect class="body-box" x="170" y="100" width="430" height="160" rx="4"/>
       <text class="body-tag" x="180" y="118">RESPONSE BODY — parse with .json()</text>
       <text class="body-text" x="180" y="140">{</text>
@@ -716,9 +855,9 @@
       <text class="body-text" x="180" y="236">&#160;&#160;"isError":false</text>
       <text class="body-text" x="180" y="252">&#160;}
 }</text>
-
       <line class="msg-back" x1="600" y1="282" x2="120" y2="282" marker-end="url(#tcj-arrow-back)"/>
     </svg>
+    <figcaption><span class="figlabel">Figure 5.</span> Mode A — single JSON response.</figcaption>
   </figure>
 
   <p><strong>Mode B &mdash; <code>text/event-stream</code>.</strong> The body is a stream of frames. Each frame is two lines &mdash; <code>event: message</code> and <code>data: &lt;json&gt;</code> &mdash; and the server can send several before closing.</p>
@@ -742,26 +881,19 @@
         .data-box   { fill: #fff4e5; stroke: #d49b4a; stroke-width: 1; }
         .data-text  { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
       </style>
-
       <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
       <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
-
       <line class="lifeline" x1="120" y1="54" x2="120" y2="450"/>
       <line class="lifeline" x1="600" y1="54" x2="600" y2="450"/>
-
       <text class="label" x="590" y="84" text-anchor="end">200 OK · Content-Type: text/event-stream</text>
-
-      <!-- ===== Frame 1 (optional progress notification) ===== -->
       <rect class="frame-box" x="160" y="100" width="450" height="90" rx="4"/>
       <text class="frame-tag" x="172" y="118">FRAME 1</text>
       <text class="sse-line" x="172" y="140">event: message</text>
       <text class="sse-line" x="172" y="158">data:</text>
       <rect class="data-box" x="230" y="148" width="370" height="30" rx="3"/>
       <text class="data-text" x="240" y="168">{"jsonrpc":"2.0","method":"notifications/progress",…}</text>
-
-      <!-- ===== Frame 2 (the actual result) ===== -->
       <rect class="frame-box" x="160" y="210" width="450" height="200" rx="4"/>
       <text class="frame-tag" x="172" y="228">FRAME 2 — the JSON-RPC result for id:3</text>
       <text class="sse-line" x="172" y="250">event: message</text>
@@ -774,9 +906,9 @@
       <text class="data-text" x="240" y="342">&#160;&#160;"isError":false</text>
       <text class="data-text" x="240" y="358">&#160;}</text>
       <text class="data-text" x="240" y="374">}</text>
-
       <line class="msg-back" x1="600" y1="435" x2="120" y2="435" marker-end="url(#tcs-arrow-back)"/>
     </svg>
+    <figcaption><span class="figlabel">Figure 6.</span> Mode B — Server-Sent Events with one or more frames.</figcaption>
   </figure>
 
   <p>
@@ -790,11 +922,11 @@
     how to read the body.
   </p>
 
-  <h3>Phase 4 &mdash; Clean up</h3>
+  <h3>2.6 Phase 4 &mdash; Terminate stateful sessions</h3>
   <p>
-    When the agent is done, it tells the server. One
-    <code>DELETE</code> with the session id, and the server tears the
-    session down.
+    When a stateful client is done, it tells the server to terminate
+    the session. One <code>DELETE</code> with the session id lets the
+    server release the associated state.
   </p>
 
   <figure class="diagram">
@@ -819,47 +951,40 @@
         .ok-box     { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1; }
         .ok-text    { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #2f7a3c; }
       </style>
-
       <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
       <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
-
       <line class="lifeline" x1="120" y1="54" x2="120" y2="220"/>
       <line class="lifeline" x1="600" y1="54" x2="600" y2="220"/>
-
-      <!-- DELETE request -->
       <text class="label" x="130" y="84">DELETE /mcp  +  Mcp-Session-Id: f41e932c…</text>
       <line class="msg" x1="120" y1="96" x2="600" y2="96" marker-end="url(#cl-arrow)"/>
-
-      <!-- Response -->
       <text class="label" x="590" y="124" text-anchor="end">200 OK</text>
       <text class="body"  x="590" y="142" text-anchor="end">"session terminated"</text>
       <line class="msg-back" x1="600" y1="156" x2="120" y2="156" marker-end="url(#cl-arrow-back)"/>
-
       <text class="note" x="130" y="184">TCP connection closed</text>
-
-      <!-- Done banner -->
       <rect class="ok-box" x="120" y="196" width="480" height="22" rx="4"/>
       <text class="ok-text" x="360" y="212" text-anchor="middle">✓ session id retired · server frees its state</text>
     </svg>
+    <figcaption><span class="figlabel">Figure 7.</span> A polite client closes the session with a single <code>DELETE</code>.</figcaption>
   </figure>
 
   <p>
-    Stateless servers don't need this &mdash; there's no session to
-    delete, so the agent just stops sending requests. For stateful
-    servers, skipping the <code>DELETE</code> isn't fatal (sessions
-    eventually time out) but it leaks server memory while they wait.
-    A polite client always cleans up.
+    Stateless servers do not need this step because there is no
+    session to delete, so the agent simply stops sending requests. For
+    stateful servers, skipping the <code>DELETE</code> is usually
+    recoverable because sessions eventually time out, but explicit
+    termination releases server-side state sooner. A polite client
+    always cleans up.
   </p>
 
-  <h3>The other two primitives &mdash; in one breath</h3>
+  <h3>2.7 Resources and prompts use the same message model</h3>
   <p>
-    MCP defines two more primitives alongside tools:
-    <strong>resources</strong> (read-only data the agent can pull into
-    context) and <strong>prompts</strong> (reusable templates the user
-    can invoke). Both follow the same JSON-RPC + JSON/SSE shape you've
-    already seen.
+    MCP defines two other primitives alongside tools:
+    <strong>resources</strong> (read-oriented data the agent can pull
+    into context, sometimes generated dynamically) and
+    <strong>prompts</strong> (reusable templates the user can invoke).
+    Both follow the same JSON-RPC + JSON/SSE shape shown above.
   </p>
 
   <figure class="diagram">
@@ -881,58 +1006,54 @@
         .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
         .body       { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #4a4a4a; }
       </style>
-
       <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
       <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
       <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
-
       <line class="lifeline" x1="120" y1="54" x2="120" y2="200"/>
       <line class="lifeline" x1="600" y1="54" x2="600" y2="200"/>
-
-      <!-- resources -->
       <text class="label" x="130" y="84">{"method":"resources/list"}</text>
       <line class="msg" x1="120" y1="92" x2="600" y2="92" marker-end="url(#rp-arrow)"/>
       <text class="body"  x="590" y="116" text-anchor="end">{"resources":[{"uri":"docs://overview","name":"Overview"}, …]}</text>
       <line class="msg-back" x1="600" y1="124" x2="120" y2="124" marker-end="url(#rp-arrow-back)"/>
-
-      <!-- prompts -->
       <text class="label" x="130" y="156">{"method":"prompts/list"}</text>
       <line class="msg" x1="120" y1="164" x2="600" y2="164" marker-end="url(#rp-arrow)"/>
       <text class="body"  x="590" y="188" text-anchor="end">{"prompts":[{"name":"summarize","arguments":[…]}, …]}</text>
       <line class="msg-back" x1="600" y1="196" x2="120" y2="196" marker-end="url(#rp-arrow-back)"/>
     </svg>
+    <figcaption><span class="figlabel">Figure 8.</span> The companion primitives: <code>resources/list</code> and <code>prompts/list</code>.</figcaption>
   </figure>
 
   <p>
-    <strong>This post focuses on tools only.</strong> Tools are where
-    the real work happens &mdash; they're the only primitive that runs
-    server-side code, hits databases, calls downstream APIs, and
-    actually <em>does</em> something. Resources are static reads;
-    prompts are templates. If your MCP server is going to fall over
-    under load, it will fall over on a <code>tools/call</code>.
+    <strong>This guide focuses on tools only.</strong> Tool calls are
+    the primary workload for this harness because they exercise the
+    highest-cost and highest-risk actions agents invoke repeatedly.
+    Resources are read-oriented operations and may still involve
+    server-side generation; prompts are reusable templates. If an MCP
+    server is going to fall over under load, it will fall over on a
+    <code>tools/call</code> &mdash; so that is the path measured here.
   </p>
 
-  <!-- ============ SECTION 2 ============ -->
-  <h2 id="scripting"><span class="num">2.</span>Writing the first Locust script</h2>
+  <!-- ============ 3. METHODOLOGY ============ -->
+  <h2 id="methodology"><span class="num">3.</span>Methodology — A First Locust Script</h2>
 
   <p>
-    Before we factor anything out, let's write the whole MCP life cycle
-    by hand against one server. The target is the public Microsoft
-    Learn MCP at <code>https://learn.microsoft.com/api/mcp</code> &mdash;
-    no auth, stateful (it issues a session id on
+    Before the harness is generalised, the entire MCP life cycle is
+    written by hand against one server. The target is the public
+    Microsoft Learn MCP at <code>https://learn.microsoft.com/api/mcp</code>
+    &mdash; no auth, stateful (it issues a session id on
     <code>initialize</code>), spec-compliant Streamable HTTP. Five
-    blocks, each one of the four wire phases plus the data we feed it.
-    Everything below could live in a single file with one import:
-    Locust.
+    blocks, each one of the four wire phases plus the data they
+    operate on. Everything below could live in a single file with one
+    import: Locust.
   </p>
 
-  <h3>Step 1. Define the data and target</h3>
+  <h3>3.1 Step 1 — Define the data and target</h3>
   <p>
     A list of queries to rotate through, and the standard Locust
     <code>FastHttpUser</code> pointed at the host. <code>mcp_path</code>
-    and <code>protocol_version</code> are constants we'll reuse in
-    every request below.
+    and <code>protocol_version</code> are constants reused in every
+    request below.
   </p>
   <pre><code>import json, random, time, itertools
 from locust import FastHttpUser, constant, task
@@ -956,15 +1077,15 @@ class LearnUser(FastHttpUser):
     # pace each VU at one task per second
     wait_time = constant(1)</code></pre>
 
-  <h3>Step 2. Initialize the session</h3>
+  <h3>3.2 Step 2 — Initialize the session</h3>
   <p>
-    Locust calls <code>on_start</code> once per virtual user. We POST
-    a JSON-RPC <code>initialize</code> with our protocol version and a
-    client name, then read the <code>Mcp-Session-Id</code> header off
-    the response &mdash; every subsequent request has to send it back.
-    The server replies as Server-Sent Events, so the body is
-    <code>data: {...}</code> framed; we pluck the JSON off the
-    <code>data:</code> line.
+    Locust calls <code>on_start</code> once per virtual user. The
+    harness POSTs a JSON-RPC <code>initialize</code> with the protocol
+    version and a client name, then reads the
+    <code>Mcp-Session-Id</code> header off the response &mdash; every
+    subsequent request has to send it back. The server replies as
+    Server-Sent Events, so the body is <code>data: {...}</code> framed;
+    the JSON is plucked off the <code>data:</code> line.
   </p>
   <pre><code>    def on_start(self):
         rpc_id = next(_id_counter)
@@ -992,13 +1113,14 @@ class LearnUser(FastHttpUser):
         self._notify_initialized()
         self._tools_list()</code></pre>
 
-  <h3>Step 3. Confirm the handshake and list available tools</h3>
+  <h3>3.3 Step 3 — Confirm the handshake and list tools</h3>
   <p>
     Two more POSTs to finish opening the session. The notification
-    tells the server we're ready (it returns 202 with no body).
-    <code>tools/list</code> is what we'd parse to discover tool names
-    dynamically &mdash; for this script we already know them, so we just
-    call it to honour the life cycle and record the latency.
+    tells the server the client is ready (it returns 202 with no body).
+    <code>tools/list</code> is what would be parsed to discover tool
+    names dynamically &mdash; for this script the names are already
+    known, so it is called purely to honour the life cycle and record
+    the latency.
   </p>
   <pre><code>    def _headers(self):
         return {
@@ -1025,15 +1147,15 @@ class LearnUser(FastHttpUser):
                               catch_response=True) as r:
             r.raise_for_status(); r.success()</code></pre>
 
-  <h3>Step 4. Call a tool under load</h3>
+  <h3>3.4 Step 4 — Call a tool under load</h3>
   <p>
     This is what repeats. Each <code>@task</code> is one tool call;
     the integer is the weight, so Locust picks each method 50% of the
     time. The wire shape is identical to <code>tools/list</code>, just
     with method <code>tools/call</code> and a <code>params</code>
     block carrying the tool name and arguments. The response comes back
-    SSE-framed; we walk the <code>data:</code> lines to find the frame
-    whose <code>id</code> matches our request.
+    SSE-framed; the harness walks the <code>data:</code> lines to find
+    the frame whose <code>id</code> matches the request.
   </p>
   <pre><code>    def _call(self, tool: str, arguments: dict):
         rpc_id = next(_id_counter)
@@ -1069,11 +1191,11 @@ class LearnUser(FastHttpUser):
     def code_sample_search(self):
         self._call("microsoft_code_sample_search", {"query": random.choice(QUERIES)})</code></pre>
 
-  <h3>Step 5. Close the session cleanly</h3>
+  <h3>3.5 Step 5 — Close the session cleanly</h3>
   <p>
     Locust calls <code>on_stop</code> when a VU is shutting down. The
     spec asks the client to terminate the session explicitly &mdash;
-    one DELETE to the same path with the session id, that's it.
+    one DELETE to the same path with the session id, that is it.
   </p>
   <pre><code>    def on_stop(self):
         if not self.session_id: return
@@ -1085,8 +1207,17 @@ class LearnUser(FastHttpUser):
         self.session_id = None</code></pre>
 
   <p>
-    That's a complete, runnable script for one MCP server &mdash;
-    initialize, notify, list, call, delete. Save it as
+    This compact sample treats <code>404</code> and <code>405</code>
+    as non-fatal teardown responses so repeated local runs do not
+    fail on cleanup quirks. For a strict stateful server benchmark,
+    <code>405</code> should be investigated or counted separately
+    because it means the endpoint did not accept the
+    <code>DELETE</code> cleanup.
+  </p>
+
+  <p>
+    That is a complete, runnable script for one MCP server &mdash;
+    initialize, notify, list, call, delete. Saved as
     <code>learn_first.py</code>. The only dependency is Locust itself:
   </p>
   <pre><code># with uv
@@ -1095,8 +1226,7 @@ uv pip install "locust>=2.31"
 # or with pip in an active venv
 python -m pip install "locust>=2.31"</code></pre>
   <p>
-    Then run it &mdash; this will produce the same six-row Locust table
-    you'll see in &sect;4:
+    Then run it &mdash; this will produce a six-row Locust table:
   </p>
   <pre><code># with uv
 uv run locust -f learn_first.py --headless -u 5 -r 1 -t 30s
@@ -1105,8 +1235,12 @@ uv run locust -f learn_first.py --headless -u 5 -r 1 -t 30s
 python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
 
   <p>
-    After 30&nbsp;seconds, Locust prints the summary table. One row
-    per request name, with counts and latency in milliseconds:
+    After 30&nbsp;seconds, Locust prints a summary table. One row per
+    request name, with counts and latency in milliseconds. The
+    illustrative output below is from a small bring-up run; the
+    production-scale numbers reported in &sect;8 are from a different
+    fifteen-minute run on Azure Load Testing and will not match line
+    for line.
   </p>
 
   <table>
@@ -1132,15 +1266,14 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
 
   <p>
     Five virtual users for thirty seconds drove 85 requests at
-    ~2.9&nbsp;RPS with zero failures. Each VU sleeps one second
-    between tasks (<code>wait_time = constant(1)</code>), so the rate
-    is paced rather than going as fast as the network allows. The
-    five lifecycle endpoints (<code>initialize</code>,
+    ~2.9&nbsp;RPS with zero failures. Each VU sleeps one second between
+    tasks (<code>wait_time = constant(1)</code>), so the rate is paced
+    rather than going as fast as the network allows. The five lifecycle
+    endpoints (<code>initialize</code>,
     <code>notifications/initialized</code>, <code>tools/list</code>,
     <code>DELETE</code>) each ran exactly once per VU; the rest is
     <code>tools/call</code>, split roughly 50/50 between the two
-    <code>@task</code> methods. We'll come back to these numbers in
-    &sect;5 when we talk about what they mean.
+    <code>@task</code> methods.
   </p>
 
   <figure class="diagram">
@@ -1165,7 +1298,6 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
           <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
         </marker>
       </defs>
-
       <rect class="pill"      x="20"  y="90" width="140" height="44" rx="22"/>
       <text class="pill-text" x="90"  y="117" text-anchor="middle">initialize</text>
       <rect class="pill"      x="190" y="90" width="140" height="44" rx="22"/>
@@ -1174,43 +1306,42 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
       <text class="pill-text" x="430" y="117" text-anchor="middle">tools/call</text>
       <rect class="pill"      x="530" y="90" width="140" height="44" rx="22"/>
       <text class="pill-text" x="600" y="117" text-anchor="middle">DELETE</text>
-
       <line class="arrow"     x1="160" y1="112" x2="190" y2="112" marker-end="url(#s2arr)"/>
       <line class="arrow"     x1="330" y1="112" x2="360" y2="112" marker-end="url(#s2arr)"/>
       <line class="arrow"     x1="500" y1="112" x2="530" y2="112" marker-end="url(#s2arr)"/>
-
       <text class="you-text"  x="430" y="50" text-anchor="middle">repeats per request</text>
       <line class="arrow-you" x1="430" y1="58"  x2="430" y2="86" marker-end="url(#s2arrG)"/>
-
       <text class="auto-text" x="90"  y="170" text-anchor="middle">once · on_start</text>
       <text class="auto-text" x="260" y="170" text-anchor="middle">once · on_start</text>
       <text class="auto-text" x="600" y="170" text-anchor="middle">once · on_stop</text>
     </svg>
-    <figcaption>The four wire phases of one MCP session. We wrote all four in <code>learn_first.py</code>; only <code>tools/call</code> repeats under load.</figcaption>
+    <figcaption><span class="figlabel">Figure 9.</span> The four wire phases of one MCP session. All four are written in <code>learn_first.py</code>; only <code>tools/call</code> repeats under load.</figcaption>
   </figure>
 
-  <!-- ============ SECTION 3 ============ -->
-  <h2 id="auth"><span class="num">3.</span>Handling auth</h2>
+  <!-- ============ 4. AUTH ============ -->
+  <h2 id="auth"><span class="num">4.</span>Authentication Patterns</h2>
 
   <p>
-    Before we generalise the script we need one more wrinkle:
-    different MCP servers authenticate differently. Three patterns
-    cover all four targets, and each one stays a one- or two-line
+    Before generalising the script, one more wrinkle: different MCP
+    servers authenticate differently. Three patterns cover all four
+    targets used in this guide, and each one stays a one- or two-line
     change on the user class.
   </p>
 
-  <h3>Pattern A &mdash; no auth (Learn, Context7)</h3>
+  <h3>4.1 Pattern A — no auth or optional bearer/API key (Learn, Context7)</h3>
   <p>
-    The endpoint is public. Nothing to set. The class doesn&rsquo;t
-    declare an <code>auth_headers</code> attribute at all and the base
-    sends the standard MCP headers untouched.
+    Microsoft Learn can be called without a bearer token. Context7 is
+    stateless in this harness and runs without extra auth, or with an
+    optional bearer/API key for quota and reliability. When no header
+    is needed, the class does not declare an <code>auth_headers</code>
+    attribute and the base sends the standard MCP headers untouched.
   </p>
 
-  <h3>Pattern B &mdash; static bearer from env (GitHub)</h3>
+  <h3>4.2 Pattern B — static bearer from env (GitHub)</h3>
   <p>
     The token lives in <code>GITHUB_MCP_TOKEN</code> (a fine-grained PAT
-    locally, a Key Vault reference in Azure Load Testing). It&rsquo;s
-    read once at import time and stamped on every request via the class
+    locally, a Key Vault reference in Azure Load Testing). It is read
+    once at import time and stamped on every request via the class
     attribute:
   </p>
 
@@ -1219,10 +1350,11 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
         "Authorization": f"Bearer {os.environ.get('GITHUB_MCP_TOKEN', '')}",
     }</code></pre>
 
-  <h3>Pattern C &mdash; dynamic token per request (ADO Remote)</h3>
+  <h3>4.3 Pattern C — dynamic token per request (ADO Remote)</h3>
   <p>
-    Azure DevOps tokens expire roughly every hour, so a static value
-    won&rsquo;t survive a long run. The class overrides
+    The Azure DevOps Remote MCP is stateless and uses Entra bearer
+    auth. Azure DevOps tokens expire roughly every hour, so a static
+    value is not suitable for a long run. The class overrides
     <code>_extra_headers()</code> &mdash; a hook the base calls before
     every POST &mdash; and mints a fresh token on demand:
   </p>
@@ -1241,39 +1373,59 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
     <code>DefaultAzureCredential</code> (cached <code>az login</code>);
     the SDK auto-refreshes. In Azure Load Testing the same function
     short-circuits to a pre-minted token injected from Key Vault. The
-    user class doesn&rsquo;t care which mode is active.
+    user class does not care which mode is active.
   </p>
 
   <p>
-    That&rsquo;s the whole auth surface: one class attribute for static
+    That is the whole auth surface: one class attribute for static
     headers, one method override for dynamic ones. Everything else
     &mdash; sessions, retries, timing &mdash; lives in the base, which
     is the next section.
   </p>
 
-  <!-- ============ SECTION 4 ============ -->
-  <h2 id="framework"><span class="num">4.</span>Framework</h2>
+  <!-- ============ 5. FRAMEWORK ============ -->
+  <h2 id="framework"><span class="num">5.</span>Framework Architecture</h2>
 
   <div class="callout good">
-    <strong>Grab the code</strong>
+    <strong>Source code</strong>
     <p>
       Everything in this section &mdash; <code>_base.py</code>,
       <code>learn.py</code>, <code>github.py</code>, <code>context7.py</code>,
       <code>ado.py</code>, <code>multi.py</code>, <code>locust.conf</code>,
-      and the Azure Load Testing YAML &mdash; lives in the public repo:
+      and the Azure Load Testing YAML &mdash; lives in the public
+      repo I maintain:
       <a href="https://github.com/kroy92/azure-load-test-mcp-server"
          target="_blank" rel="noopener">github.com/kroy92/azure-load-test-mcp-server</a>.
-      Clone it and follow along.
     </p>
   </div>
 
   <p>
-    <code>learn_first.py</code> works, but every other MCP server we want
-    to test does the same five-block dance &mdash; initialize, notify,
-    list, call, delete. Only the host, the tool names, and (for some)
-    the auth header change. So we lifted the wire plumbing into a
-    shared base class and let each per-server file keep just the bits
-    that actually differ.
+    <code>learn_first.py</code> works, but every MCP server in this
+    study follows the same five-block flow &mdash; initialize, notify,
+    list, call, and DELETE only for session-bearing users. Only the
+    host, the tool names, session posture, and auth headers change.
+    The wire plumbing is therefore lifted into a shared base class,
+    leaving each per-server file with only the configuration and
+    tasks that genuinely differ.
+  </p>
+
+  <div class="callout">
+    <strong>Why a flat-file framework?</strong>
+    <p>
+      The harness keeps <code>_base.py</code>, one server file per MCP
+      endpoint, <code>multi.py</code>, and the config files in a flat
+      project root so Azure Load Testing can upload the same file set
+      directly. That shape avoids packaging steps, keeps each server
+      easy to inspect, and makes local and cloud runs use the same
+      imports.
+    </p>
+  </div>
+
+  <p>
+    The same framework is useful before rolling out a custom MCP
+    server: add one user class for the new endpoint, import it from
+    <code>multi.py</code>, and benchmark the server's tool mix locally
+    and in Azure Load Testing before enabling broader agent traffic.
   </p>
 
   <p>
@@ -1284,12 +1436,13 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
     <code>_call</code> wraps <code>_jsonrpc</code> for every
     <code>tools/call</code>; <code>wait_time</code> implements the
     agent-shaped 80/20 think time; <code>_extra_headers</code> is the
-    hook subclasses override to mint auth tokens. Stateful servers
-    (Learn, GitHub) inherit <code>MCPUserBase</code> directly.
-    Stateless servers (Context7, ADO Remote) go through
-    <code>StatelessMCPUser</code>, which just flips
+    hook subclasses override to mint auth tokens. Session-bearing
+    users in this harness (Learn as observed in the demo run, and
+    GitHub) inherit <code>MCPUserBase</code> directly. Stateless
+    servers (Context7, ADO Remote) go through
+    <code>StatelessMCPUser</code>, which sets
     <code>requires_session = False</code> so the DELETE step is a
-    no-op. Each leaf class is then a handful of <code>@task</code>
+    no-op. Each leaf class is then a small set of <code>@task</code>
     methods.
   </p>
 
@@ -1312,8 +1465,6 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
           <path d="M0,0 L12,6 L0,12 z" fill="#fff" stroke="#6b6b6b" stroke-width="1.2"/>
         </marker>
       </defs>
-
-      <!-- ===== MCPUserBase (top) ===== -->
       <g>
         <rect class="cls-base" x="240" y="20" width="280" height="186" rx="6"/>
         <text class="cls-name" x="380" y="42" text-anchor="middle">MCPUserBase</text>
@@ -1328,8 +1479,6 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
         <text class="mth" x="256" y="184">_terminate_session()</text>
         <text class="mth" x="256" y="200">_call() · _jsonrpc()</text>
       </g>
-
-      <!-- ===== LearnUser (left leaf, direct child) ===== -->
       <g>
         <rect class="cls-leaf" x="20" y="280" width="200" height="120" rx="6"/>
         <text class="cls-name" x="120" y="302" text-anchor="middle">LearnUser</text>
@@ -1338,8 +1487,6 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
         <text class="mth" x="36" y="348">docs_search()</text>
         <text class="mth" x="36" y="364">code_sample_search()</text>
       </g>
-
-      <!-- ===== GitHubUser (mid-left leaf, direct child) ===== -->
       <g>
         <rect class="cls-leaf" x="240" y="280" width="200" height="160" rx="6"/>
         <text class="cls-name" x="340" y="302" text-anchor="middle">GitHubUser</text>
@@ -1351,8 +1498,6 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
         <text class="mth" x="256" y="396">whoami()</text>
         <text class="mth" x="256" y="412">list_issues()</text>
       </g>
-
-      <!-- ===== StatelessMCPUser (right intermediate) ===== -->
       <g>
         <rect class="cls-mid" x="540" y="120" width="200" height="86" rx="6"/>
         <text class="cls-name" x="640" y="142" text-anchor="middle">StatelessMCPUser</text>
@@ -1360,8 +1505,6 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
         <line class="sep" x1="548" y1="168" x2="732" y2="168"/>
         <text class="mth" x="556" y="188">requires_session = False</text>
       </g>
-
-      <!-- ===== Context7User (right leaf) ===== -->
       <g>
         <rect class="cls-leaf" x="460" y="320" width="200" height="120" rx="6"/>
         <text class="cls-name" x="560" y="342" text-anchor="middle">Context7User</text>
@@ -1370,8 +1513,6 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
         <text class="mth" x="476" y="388">query_docs()</text>
         <text class="mth" x="476" y="404">resolve_library()</text>
       </g>
-
-      <!-- ===== ADOUser (right-most leaf) ===== -->
       <g>
         <rect class="cls-leaf" x="680" y="280" width="200" height="200" rx="6"/>
         <text class="cls-name" x="780" y="302" text-anchor="middle">ADOUser</text>
@@ -1384,15 +1525,68 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
         <text class="mth" x="696" y="412">list_recent_builds()</text>
         <text class="mth" x="696" y="428">_extra_headers()</text>
       </g>
-
-      <!-- ===== inheritance arrows (open triangle to parent) ===== -->
       <path class="inh" d="M120,280 L120,240 L380,240 L380,206" marker-end="url(#s3inh)"/>
       <path class="inh" d="M340,280 L340,206" marker-end="url(#s3inh)"/>
       <path class="inh" d="M640,120 L640,90 L520,90 L520,70" marker-end="url(#s3inh)"/>
       <path class="inh" d="M560,320 L560,260 L640,260 L640,206" marker-end="url(#s3inh)"/>
       <path class="inh" d="M780,280 L780,230 L640,230 L640,206" marker-end="url(#s3inh)"/>
     </svg>
-    <figcaption>The factoring. Hollow arrows point at the parent class. Stateful servers inherit <code>MCPUserBase</code> directly; stateless servers route through <code>StatelessMCPUser</code> to skip the DELETE step.</figcaption>
+    <figcaption><span class="figlabel">Figure 10.</span> Class hierarchy. Hollow arrows point at the parent class. Stateful servers inherit <code>MCPUserBase</code> directly; stateless servers route through <code>StatelessMCPUser</code> to skip the DELETE step.</figcaption>
+  </figure>
+
+  <figure class="diagram diagram-wide">
+    <svg viewBox="0 0 900 330" role="img"
+         aria-label="multi.py imports LearnUser, GitHubUser, Context7User, and ADOUser so Locust can discover all four user classes and run them in one process.">
+      <style>
+        .mp-file { fill: #fdfdfc; stroke: #cfc9bd; stroke-width: 1.4; }
+        .mp-head { fill: #1f3b5c; }
+        .mp-title { font: 700 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #fff; }
+        .mp-code { font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .mp-card { fill: #ebf3fb; stroke: #5586b3; stroke-width: 1.2; }
+        .mp-card-alt { fill: #fff4e5; stroke: #b25a00; stroke-width: 1.2; }
+        .mp-name { font: 700 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .mp-sub { font: italic 11px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+        .mp-arrow { stroke: #6b6b6b; stroke-width: 1.4; fill: none; }
+        .mp-locust { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1.4; }
+      </style>
+      <defs>
+        <marker id="mp-arr" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/>
+        </marker>
+      </defs>
+      <g>
+        <rect class="mp-file" x="28" y="42" width="392" height="220" rx="8"/>
+        <rect class="mp-head" x="28" y="42" width="392" height="34" rx="8"/>
+        <text class="mp-title" x="48" y="64">multi.py</text>
+        <text class="mp-code" x="52" y="112">from learn import LearnUser</text>
+        <text class="mp-code" x="52" y="144">from github import GitHubUser</text>
+        <text class="mp-code" x="52" y="176">from context7 import Context7User</text>
+        <text class="mp-code" x="52" y="208">from ado import ADOUser</text>
+        <text class="mp-sub" x="52" y="242">No orchestration code. Imports make the classes visible to Locust.</text>
+      </g>
+      <g>
+        <rect class="mp-card" x="520" y="20" width="160" height="48" rx="7"/>
+        <text class="mp-name" x="600" y="42" text-anchor="middle">LearnUser</text>
+        <text class="mp-sub" x="600" y="58" text-anchor="middle">learn.py</text>
+        <rect class="mp-card" x="710" y="86" width="160" height="48" rx="7"/>
+        <text class="mp-name" x="790" y="108" text-anchor="middle">GitHubUser</text>
+        <text class="mp-sub" x="790" y="124" text-anchor="middle">github.py</text>
+        <rect class="mp-card-alt" x="520" y="152" width="160" height="48" rx="7"/>
+        <text class="mp-name" x="600" y="174" text-anchor="middle">Context7User</text>
+        <text class="mp-sub" x="600" y="190" text-anchor="middle">context7.py</text>
+        <rect class="mp-card-alt" x="710" y="218" width="160" height="48" rx="7"/>
+        <text class="mp-name" x="790" y="240" text-anchor="middle">ADOUser</text>
+        <text class="mp-sub" x="790" y="256" text-anchor="middle">ado.py</text>
+      </g>
+      <path class="mp-arrow" d="M420,112 C462,112 478,44 520,44" marker-end="url(#mp-arr)"/>
+      <path class="mp-arrow" d="M420,144 C514,144 616,110 710,110" marker-end="url(#mp-arr)"/>
+      <path class="mp-arrow" d="M420,176 L520,176" marker-end="url(#mp-arr)"/>
+      <path class="mp-arrow" d="M420,208 C514,208 616,242 710,242" marker-end="url(#mp-arr)"/>
+      <rect class="mp-locust" x="438" y="286" width="300" height="34" rx="17"/>
+      <text class="mp-name" x="588" y="308" text-anchor="middle">Locust discovers every imported User class</text>
+    </svg>
+    <figcaption><span class="figlabel">Figure 11.</span> <code>multi.py</code> is the composition point: importing each user class is enough for one Locust process to run all four MCP workloads together.</figcaption>
   </figure>
 
   <p>
@@ -1406,16 +1600,15 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
     the engines just need the same env vars.
   </p>
 
-  <!-- ============ SECTION 5 ============ -->
-  <h2 id="everywhere"><span class="num">5.</span>One process, four servers &mdash; locally and in the cloud</h2>
+  <!-- ============ 6. DEPLOYMENT ============ -->
+  <h2 id="deployment"><span class="num">6.</span>Deployment — Local and Cloud Execution</h2>
 
   <p>
-    Four user classes, but we want one Locust process driving all of
-    them &mdash; and we want the same files to run in Azure Load
-    Testing without edits. <code>multi.py</code> is the entrypoint.
-    It&rsquo;s twenty lines of imports; Locust discovers each
-    <code>User</code> subclass and spawns its declared
-    <code>fixed_count</code>:
+    Four user classes, but the goal is one Locust process driving all
+    of them &mdash; and the same files running in Azure Load Testing
+    without edits. <code>multi.py</code> is the entrypoint. It is
+    twenty lines of imports; Locust discovers each <code>User</code>
+    subclass and spawns its declared <code>fixed_count</code>:
   </p>
 
   <pre><code>from ado import ADOUser            # noqa: F401
@@ -1433,8 +1626,8 @@ from learn import LearnUser        # noqa: F401</code></pre>
 
   <p>
     Same files, no changes &mdash; ship them to <strong>Azure Load
-    Testing</strong> through a one-page YAML. Azure Load Testing uploads the project,
-    spins up engine VMs (1–45), runs the same
+    Testing</strong> through a one-page YAML. Azure Load Testing
+    uploads the project, spins up engine VMs (1–45), runs the same
     <code>locust -f multi.py</code> behind the scenes, and streams
     results back to a portal dashboard:
   </p>
@@ -1480,10 +1673,11 @@ failureCriteria:
   - percentage(error) &gt; 25</code></pre>
 
   <p>
-    Submit it with the Azure CLI. Azure Load Testing pulls the secrets from Key Vault
-    via its system-assigned identity at run time, so the only thing
-    you need locally is an <code>az&nbsp;login</code> against the
-    subscription that owns the load-testing resource:
+    The test is submitted with the Azure CLI. Azure Load Testing pulls
+    the secrets from Key Vault via its system-assigned identity at run
+    time, so the only thing required locally is an
+    <code>az&nbsp;login</code> against the subscription that owns the
+    load-testing resource:
   </p>
 
   <pre><code>$ az login
@@ -1496,48 +1690,50 @@ $ az load test-run create \
     --load-test-resource &lt;your-loadtest-resource&gt; \
     --resource-group &lt;your-rg&gt; \
     --test-id mcp-multi-flat \
-    --test-run-id run-$(Get-Date -Format yyyyMMdd-HHmmss) \
+    --test-run-id run-$(date +%Y%m%d-%H%M%S) \
     --no-wait</code></pre>
 
   <p>
     One wrinkle worth calling out: the ADO Remote MCP server uses
-    Entra&nbsp;ID and its tokens expire in about an hour. If your
-    Azure DevOps organisation lives in a different tenant from the
-    subscription that hosts Azure Load Testing, before each run you need to
-    <code>az&nbsp;login</code> against the ADO tenant, request an
-    access token for the Azure DevOps resource, and write it to the
-    <code>ado-mcp-token</code> Key Vault secret. Same tenant for both?
-    Skip it entirely &mdash; when you run Locust on your laptop your
+    Entra&nbsp;ID and its tokens expire in about an hour. If the Azure
+    DevOps organisation lives in a different tenant from the
+    subscription that hosts Azure Load Testing, before each run the
+    operator needs to <code>az&nbsp;login</code> against the ADO
+    tenant, request an access token for the Azure DevOps resource, and
+    write it to the <code>ado-mcp-token</code> Key Vault secret. Same
+    tenant for both? Skip it entirely &mdash; when Locust runs locally,
     <code>az&nbsp;login</code> reads the secrets from Key Vault, and
-    when Azure Load Testing runs the test in the cloud the load-test resource's
-    managed identity does the same thing.
+    when Azure Load Testing runs the test in the cloud the load-test
+    resource's managed identity does the same thing.
   </p>
 
   <p>
-    Three things keep this honest. <strong>Auth</strong>: secrets never
-    leave Key Vault &mdash; Azure Load Testing pulls them via managed identity and the
-    user classes read the same env-var names locally and in cloud.
-    <strong>Failure criteria</strong> turn the YAML into a pass/fail
-    gate suitable for a release pipeline. <strong>Engine count</strong>
-    is the only knob that changes when you scale: bump
-    <code>engineInstances</code> to spread the same VU mix across more
-    workers.
+    Three design choices keep the run reproducible.
+    <strong>Auth</strong>: secret values are resolved from Key Vault
+    at run time and are not stored in source files or the YAML
+    definition. Azure Load Testing reads them via managed identity,
+    and the user classes read the same env-var names locally and in
+    cloud. <strong>Failure criteria</strong> turn the YAML into a
+    pass/fail gate suitable for a release pipeline.
+    <strong>Engine count</strong> is the scaling setting: increase
+    <code>engineInstances</code> to spread the same VU mix across
+    more workers.
   </p>
 
-  <!-- ============ SECTION 6 ============ -->
-  <h2 id="workload"><span class="num">6.</span>Running a demo test</h2>
+  <!-- ============ 7. WORKLOAD ============ -->
+  <h2 id="workload"><span class="num">7.</span>Experimental Setup</h2>
 
   <p>
-    Same four files, real endpoints. Before we look at the run output,
-    here&rsquo;s what one Locust process actually puts on the wire when
-    you launch it.
+    Same four files, real endpoints. Before the run output, this
+    section describes what one Locust process actually puts on the
+    wire when launched.
   </p>
 
-  <h3>Workload model</h3>
+  <h3>7.1 Workload model</h3>
 
   <p>
-    Seventeen virtual users split four ways, each VU picking tools from
-    its server&rsquo;s <code>@task</code> weights, paced by the
+    Seventeen virtual users split four ways, each VU picking tools
+    from its server's <code>@task</code> weights, paced by the
     agent-shaped think time (80% short intra-turn pauses
     0.1&ndash;0.5&nbsp;s, 20% inter-turn idles 5&ndash;30&nbsp;s).
   </p>
@@ -1551,12 +1747,10 @@ $ az load test-run create \
         .src-sub    { font: italic 12px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
         .src-vu     { font: 700 22px -apple-system, "Segoe UI", sans-serif; fill: #b25a00; }
         .src-vutag  { font: 11px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
-
         .card       { fill: #fbfaf6; stroke: #5586b3; stroke-width: 1.4; }
         .card-gh    { stroke: #1f2937; }
         .card-c7    { stroke: #b25a00; }
         .card-ado   { stroke: #2b6cb0; }
-
         .srv-name   { font: 700 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
         .srv-host   { font: italic 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6b6b6b; }
         .vu-badge   { fill: #ebf3fb; stroke: #5586b3; stroke-width: 1; }
@@ -1564,7 +1758,6 @@ $ az load test-run create \
         .vu-badge-c7   { fill: #fff4e5; stroke: #b25a00; }
         .vu-badge-ado  { fill: #ebf3fb; stroke: #2b6cb0; }
         .vu-badge-tx{ font: 700 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
-
         .tool-name  { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
         .task-tag   { font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6b6b6b; }
         .bar-bg     { fill: #f5f3ef; stroke: #e7e3dc; }
@@ -1573,7 +1766,6 @@ $ az load test-run create \
         .bar-c7     { fill: #b25a00; }
         .bar-ado    { fill: #2b6cb0; }
         .bar-pct    { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
-
         .arrow      { stroke: #6b6b6b; stroke-width: 1.6; fill: none; }
         .arrow-tx   { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
         .arrow-pill { fill: #ffffff; stroke: #cfd6df; stroke-width: 1; }
@@ -1584,8 +1776,6 @@ $ az load test-run create \
           <path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/>
         </marker>
       </defs>
-
-      <!-- ============ source: Locust ============ -->
       <g>
         <rect class="src" x="20" y="280" width="190" height="170" rx="10"/>
         <text class="src-name" x="115" y="315" text-anchor="middle">Locust</text>
@@ -1594,143 +1784,110 @@ $ az load test-run create \
         <text class="src-vutag" x="115" y="403" text-anchor="middle">virtual users</text>
         <text class="src-vutag" x="115" y="428" text-anchor="middle" style="font-family: ui-monospace, Menlo, Consolas, monospace; fill:#b25a00;">users = 17</text>
       </g>
-
-      <!-- ============ arrows (Locust right edge -> server card left edge) ============ -->
-      <!-- Learn center y = 65 -->
       <path class="arrow" d="M210,360 C245,360 245,65 280,65" marker-end="url(#wlarr)"/>
       <rect class="arrow-pill" x="212" y="148" width="54" height="18" rx="9"/>
       <text class="arrow-tx" x="239" y="161" text-anchor="middle">5 VUs</text>
-
-      <!-- GitHub center y = 240 -->
       <path class="arrow" d="M210,360 C245,360 245,240 280,240" marker-end="url(#wlarr)"/>
       <rect class="arrow-pill" x="212" y="291" width="54" height="18" rx="9"/>
       <text class="arrow-tx" x="239" y="304" text-anchor="middle">2 VUs</text>
-
-      <!-- Context7 center y = 415 -->
       <path class="arrow" d="M210,360 C245,360 245,415 280,415" marker-end="url(#wlarr)"/>
       <rect class="arrow-pill" x="212" y="378" width="54" height="18" rx="9"/>
       <text class="arrow-tx" x="239" y="391" text-anchor="middle">5 VUs</text>
-
-      <!-- ADO center y = 595 -->
       <path class="arrow" d="M210,360 C245,360 245,595 280,595" marker-end="url(#wlarr)"/>
       <rect class="arrow-pill" x="212" y="475" width="54" height="18" rx="9"/>
       <text class="arrow-tx" x="239" y="488" text-anchor="middle">5 VUs</text>
-
-      <!-- ============ Card 1: Microsoft Learn (y=10, h=110) ============ -->
       <g>
         <rect class="card" x="280" y="10" width="600" height="110" rx="8"/>
         <text class="srv-name" x="296" y="36">LearnUser</text>
         <text class="srv-host" x="296" y="54">learn.microsoft.com/api/mcp  &middot;  no auth</text>
         <rect class="vu-badge" x="740" y="20" width="124" height="22" rx="11"/>
         <text class="vu-badge-tx" x="802" y="36" text-anchor="middle">fixed_count = 5</text>
-
-        <!-- bar 1: microsoft_docs_search @task(1) 50% -->
         <text class="tool-name" x="296" y="84">microsoft_docs_search</text>
         <text class="task-tag" x="500" y="84">@task(1)</text>
         <rect class="bar-bg"   x="576" y="74" width="220" height="14"/>
         <rect class="bar-fill" x="576" y="74" width="110" height="14"/>
         <text class="bar-pct"  x="810" y="84">50%</text>
-        <!-- bar 2: microsoft_code_sample_search @task(1) 50% -->
         <text class="tool-name" x="296" y="106">microsoft_code_sample_search</text>
         <text class="task-tag" x="500" y="106">@task(1)</text>
         <rect class="bar-bg"   x="576" y="96" width="220" height="14"/>
         <rect class="bar-fill" x="576" y="96" width="110" height="14"/>
         <text class="bar-pct"  x="810" y="106">50%</text>
       </g>
-
-      <!-- ============ Card 2: GitHub (y=140, h=200) ============ -->
       <g>
         <rect class="card card-gh" x="280" y="140" width="600" height="200" rx="8"/>
         <text class="srv-name" x="296" y="166">GitHubUser</text>
         <text class="srv-host" x="296" y="184">api.githubcopilot.com/mcp/  &middot;  bearer (PAT)</text>
         <rect class="vu-badge vu-badge-gh" x="740" y="150" width="124" height="22" rx="11"/>
         <text class="vu-badge-tx" x="802" y="166" text-anchor="middle">fixed_count = 2</text>
-
-        <!-- 5 tools, 24px row pitch starting y=210 -->
         <text class="tool-name" x="296" y="216">search_code</text>
         <text class="task-tag" x="500" y="216">@task(3)</text>
         <rect class="bar-bg" x="576" y="206" width="220" height="14"/>
         <rect class="bar-gh" x="576" y="206" width="73"  height="14"/>
         <text class="bar-pct" x="810" y="216">33%</text>
-
         <text class="tool-name" x="296" y="240">search_repositories</text>
         <text class="task-tag" x="500" y="240">@task(2)</text>
         <rect class="bar-bg" x="576" y="230" width="220" height="14"/>
         <rect class="bar-gh" x="576" y="230" width="48"  height="14"/>
         <text class="bar-pct" x="810" y="240">22%</text>
-
         <text class="tool-name" x="296" y="264">get_file_contents</text>
         <text class="task-tag" x="500" y="264">@task(2)</text>
         <rect class="bar-bg" x="576" y="254" width="220" height="14"/>
         <rect class="bar-gh" x="576" y="254" width="48"  height="14"/>
         <text class="bar-pct" x="810" y="264">22%</text>
-
         <text class="tool-name" x="296" y="288">get_me</text>
         <text class="task-tag" x="500" y="288">@task(1)</text>
         <rect class="bar-bg" x="576" y="278" width="220" height="14"/>
         <rect class="bar-gh" x="576" y="278" width="24"  height="14"/>
         <text class="bar-pct" x="810" y="288">11%</text>
-
         <text class="tool-name" x="296" y="312">list_issues</text>
         <text class="task-tag" x="500" y="312">@task(1)</text>
         <rect class="bar-bg" x="576" y="302" width="220" height="14"/>
         <rect class="bar-gh" x="576" y="302" width="24"  height="14"/>
         <text class="bar-pct" x="810" y="312">11%</text>
       </g>
-
-      <!-- ============ Card 3: Context7 (y=360, h=110) ============ -->
       <g>
         <rect class="card card-c7" x="280" y="360" width="600" height="110" rx="8"/>
         <text class="srv-name" x="296" y="386">Context7User</text>
-        <text class="srv-host" x="296" y="404">mcp.context7.com/mcp  &middot;  no auth</text>
+        <text class="srv-host" x="296" y="404">mcp.context7.com/mcp  &middot;  optional bearer/API key</text>
         <rect class="vu-badge vu-badge-c7" x="740" y="370" width="124" height="22" rx="11"/>
         <text class="vu-badge-tx" x="802" y="386" text-anchor="middle">fixed_count = 5</text>
-
         <text class="tool-name" x="296" y="434">query-docs</text>
         <text class="task-tag" x="500" y="434">@task(3)</text>
         <rect class="bar-bg" x="576" y="424" width="220" height="14"/>
         <rect class="bar-c7" x="576" y="424" width="165" height="14"/>
         <text class="bar-pct" x="810" y="434">75%</text>
-
         <text class="tool-name" x="296" y="456">resolve-library-id</text>
         <text class="task-tag" x="500" y="456">@task(1)</text>
         <rect class="bar-bg" x="576" y="446" width="220" height="14"/>
         <rect class="bar-c7" x="576" y="446" width="55"  height="14"/>
         <text class="bar-pct" x="810" y="456">25%</text>
       </g>
-
-      <!-- ============ Card 4: Azure DevOps Remote (y=490, h=210) ============ -->
       <g>
         <rect class="card card-ado" x="280" y="490" width="600" height="210" rx="8"/>
         <text class="srv-name" x="296" y="516">ADOUser</text>
         <text class="srv-host" x="296" y="534">mcp.dev.azure.com/{org}  &middot;  Entra bearer (per request)</text>
         <rect class="vu-badge vu-badge-ado" x="740" y="500" width="124" height="22" rx="11"/>
         <text class="vu-badge-tx" x="802" y="516" text-anchor="middle">fixed_count = 5</text>
-
         <text class="tool-name" x="296" y="566">wit_work_item:get</text>
         <text class="task-tag" x="500" y="566">@task(3)</text>
         <rect class="bar-bg" x="576" y="556" width="220" height="14"/>
         <rect class="bar-ado" x="576" y="556" width="66" height="14"/>
         <text class="bar-pct" x="810" y="566">30%</text>
-
         <text class="tool-name" x="296" y="590">wit_work_item:my</text>
         <text class="task-tag" x="500" y="590">@task(2)</text>
         <rect class="bar-bg" x="576" y="580" width="220" height="14"/>
         <rect class="bar-ado" x="576" y="580" width="44" height="14"/>
         <text class="bar-pct" x="810" y="590">20%</text>
-
         <text class="tool-name" x="296" y="614">search_workitem</text>
         <text class="task-tag" x="500" y="614">@task(2)</text>
         <rect class="bar-bg" x="576" y="604" width="220" height="14"/>
         <rect class="bar-ado" x="576" y="604" width="44" height="14"/>
         <text class="bar-pct" x="810" y="614">20%</text>
-
         <text class="tool-name" x="296" y="638">repo_repository</text>
         <text class="task-tag" x="500" y="638">@task(2)</text>
         <rect class="bar-bg" x="576" y="628" width="220" height="14"/>
         <rect class="bar-ado" x="576" y="628" width="44" height="14"/>
         <text class="bar-pct" x="810" y="638">20%</text>
-
         <text class="tool-name" x="296" y="662">pipelines_build</text>
         <text class="task-tag" x="500" y="662">@task(1)</text>
         <rect class="bar-bg" x="576" y="652" width="220" height="14"/>
@@ -1738,15 +1895,15 @@ $ az load test-run create \
         <text class="bar-pct" x="810" y="662">10%</text>
       </g>
     </svg>
-    <figcaption>One Locust process &rarr; four MCP servers. Each card&rsquo;s bars are the per-tool <code>@task</code> weights inside that <code>User</code> class.</figcaption>
+    <figcaption><span class="figlabel">Figure 12.</span> One Locust process &rarr; four MCP servers. Each card&rsquo;s bars are the per-tool <code>@task</code> weights inside that <code>User</code> class.</figcaption>
   </figure>
 
-  <h3 style="margin-top: 1.5em;">Trying it locally first</h3>
+  <h3>7.2 Local validation</h3>
 
   <p>
-    Before sending it to the cloud, the same workload runs in one
-    Python process on your laptop. <code>locust.conf</code> pins the
-    knobs (and is the same file Azure Load Testing consumes via
+    Before sending the workload to the cloud, run it in one Python
+    process locally. <code>locust.conf</code> pins the settings (and
+    is the same file Azure Load Testing consumes via
     <code>userPropertyFile</code>):
   </p>
 
@@ -1764,12 +1921,11 @@ html        = results/run.html</code></pre>
 
   <p>
     Useful for catching a broken assertion or an expired token in two
-    minutes instead of fifteen. For this post though, the run that
-    matters is the one that proves the cloud path works &mdash; so
-    let's submit it to Azure Load Testing.
+    minutes instead of fifteen. The headline run reported in this guide
+    is the cloud-path execution submitted to Azure Load Testing.
   </p>
 
-  <h3 style="margin-top: 1.5em;">Running it on Azure Load Testing</h3>
+  <h3>7.3 Cloud execution</h3>
 
   <p>
     Same project root, same <code>multi.py</code>, same
@@ -1787,14 +1943,21 @@ $ az load test-run create \
     --load-test-resource &lt;your-loadtest-resource&gt; \
     --resource-group &lt;your-rg&gt; \
     --test-id mcp-multi-flat \
-    --test-run-id run-$(Get-Date -Format yyyyMMdd-HHmmss) \
+    --test-run-id run-$(date +%Y%m%d-%H%M%S) \
     --no-wait</code></pre>
 
   <p>
-    Azure Load Testing spins up an engine, pulls the secrets from Key Vault via its
-    managed identity, fans out to the four MCP servers, and writes
-    <code>engine1_results.csv</code> back to blob storage. Fifteen
-    minutes later:
+    Azure Load Testing spins up an engine, pulls the secrets from Key
+    Vault via its managed identity, fans out to the four MCP servers,
+    and writes <code>engine1_results.csv</code> back to blob storage.
+  </p>
+
+  <!-- ============ 8. RESULTS ============ -->
+  <h2 id="results"><span class="num">8.</span>Results</h2>
+
+  <p>
+    The headline run completed in fifteen minutes (2026-05-09) with the
+    following verdict:
   </p>
 
   <pre><code># status + verdict
@@ -1826,38 +1989,21 @@ Count Fail Label
    31    0 github:tools/call:list_issues
    30    0 github:tools/call:get_me</code></pre>
 
-  <!-- ============ SECTION 7 ============ -->
-  <h2 id="results"><span class="num">7.</span>Results</h2>
+  <h3>8.1 Per-server performance summary</h3>
 
   <p>
-    Azure Load Testing bundles a self-contained dashboard with every run &mdash;
-    charts, error explorer, per-minute time series, the lot. Pull it
-    down with one command:
+    Azure Load Testing bundles a self-contained dashboard with every
+    run &mdash; charts, error explorer, per-minute time series. The
+    summary diagrams below distil that into one chart per server. Blue
+    bar = avg, orange extension = avg&nbsp;&rarr;&nbsp;p90, label =
+    <em>avg&nbsp;/&nbsp;p90</em> in milliseconds.
   </p>
 
   <pre><code>$ az load test-run download-files \
     --load-test-resource &lt;your-loadtest-resource&gt; \
     --resource-group &lt;your-rg&gt; \
     --test-run-id run-2026-05-09-15m-clean-172854 \
-    --path ./report --report --force
-
-# unzip and open
-$ Expand-Archive ./report/reports.zip -DestinationPath ./report -Force
-$ Invoke-Item ./report/index.html</code></pre>
-
-  <p>
-    A frozen copy of the dashboard from the run above lives at
-    <a href="sample-report/index.html"><strong>sample-report/index.html</strong></a>
-    next to this post &mdash; click around for the full picture.
-  </p>
-
-  <!-- ============ SECTION 7b ============ -->
-  <h3 id="summary"><span class="num">7b.</span>Report</h3>
-
-  <p>
-    One diagram per server. Blue&nbsp;bar = avg, orange&nbsp;extension =
-    avg&nbsp;&rarr;&nbsp;p90, label = <em>avg&nbsp;/&nbsp;p90</em> in ms.
-  </p>
+    --path ./report --report --force</code></pre>
 
   <style>
     .perf-fig { margin: 1.5em 0; }
@@ -1874,18 +2020,12 @@ $ Invoke-Item ./report/index.html</code></pre>
     .perf-svg .tick      { font: 10px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
     .perf-svg .col-hdr   { font: 600 10px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; text-transform: uppercase; letter-spacing: 0.04em; }
     .perf-svg .bar-avg   { fill: #5586b3; }
-    .perf-svg .bar-avg-sw{ fill: #5586b3; }
     .perf-svg .bar-p90-fill { fill: #f4a574; }
-    .perf-svg .bar-p90   { stroke: #b25a00; stroke-width: 2; }
-    .perf-svg .bar-p90-sw{ stroke: #b25a00; stroke-width: 2; fill: none; }
     .perf-svg .barval    { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
     .perf-svg .barval .p90num { fill: #b25a00; font-weight: 700; }
-    .perf-svg .barval-in { font: 600 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #ffffff; }
-    .perf-svg .barval-p90{ font: 600 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #b25a00; }
     .perf-svg .err-ok    { fill: #2f7a3a; font: 600 11px -apple-system, "Segoe UI", sans-serif; }
     .perf-svg .err-bad   { fill: #b23a3a; font: 700 11px -apple-system, "Segoe UI", sans-serif; }
     .perf-svg .legend-tx { font: 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
-
     .server-card {
       border: 1px solid #e3dccd;
       border-radius: 14px;
@@ -1907,10 +2047,9 @@ $ Invoke-Item ./report/index.html</code></pre>
     .server-card > p { margin: 0.25em 0 0.75em; font-size: 0.95em; color: #2a2a2a; }
   </style>
 
-  <!-- ===== Learn ===== -->
   <section class="server-card">
   <figure class="perf-fig">
-<svg class="perf-svg" viewBox="0 0 800 304" role="img" aria-label="LearnUser: handshake, tool calls, and cleanup performance from a 15-minute Azure Load Testing run.">
+<svg class="perf-svg" viewBox="0 0 800 304" role="img" aria-label="LearnUser performance from a 15-minute Azure Load Testing run.">
   <text class="card-name" x="0" y="20">LearnUser</text>
   <text class="card-sub"  x="86" y="20">735 requests &middot; 0 errors &middot; 5 VUs &middot; learn.microsoft.com/api/mcp</text>
   <rect class="bar-avg" x="540" y="11" width="12" height="9"/><text class="legend-tx" x="558" y="20">avg</text>
@@ -1973,19 +2112,18 @@ $ Invoke-Item ./report/index.html</code></pre>
   <text class="col-hdr" x="265" y="289" text-anchor="end">calls</text>
   <text class="col-hdr" x="750" y="289" text-anchor="middle">err</text>
 </svg>
-    <figcaption>Public docs API, no auth. The fastest of the four.</figcaption>
+    <figcaption><span class="figlabel">Figure 13.</span> Microsoft Learn &mdash; public docs API, no auth. The fastest of the four observed in this run.</figcaption>
   </figure>
   <p>
     <strong>Observation.</strong> Both doc-search tools sit tightly under
-    900&nbsp;ms p90 with zero errors &mdash; likely a CDN-fronted, cached
-    search index serving anonymous traffic.
+    900&nbsp;ms p90 with zero errors &mdash; consistent with a CDN-fronted,
+    cached search index serving anonymous traffic.
   </p>
   </section>
 
-  <!-- ===== GitHub ===== -->
   <section class="server-card">
   <figure class="perf-fig">
-<svg class="perf-svg" viewBox="0 0 800 370" role="img" aria-label="GitHubUser: handshake, tool calls, and cleanup performance from a 15-minute Azure Load Testing run.">
+<svg class="perf-svg" viewBox="0 0 800 370" role="img" aria-label="GitHubUser performance from a 15-minute Azure Load Testing run.">
   <text class="card-name" x="0" y="20">GitHubUser</text>
   <text class="card-sub"  x="94" y="20">292 requests &middot; 3 errors &middot; 2 VUs &middot; api.githubcopilot.com/mcp</text>
   <rect class="bar-avg" x="540" y="11" width="12" height="9"/><text class="legend-tx" x="558" y="20">avg</text>
@@ -2063,19 +2201,18 @@ $ Invoke-Item ./report/index.html</code></pre>
   <text class="col-hdr" x="265" y="355" text-anchor="end">calls</text>
   <text class="col-hdr" x="750" y="355" text-anchor="middle">err</text>
 </svg>
-    <figcaption>PAT-authenticated. <code>search_code</code> is bimodal &mdash; rate-limit backoff drives the p90.</figcaption>
+    <figcaption><span class="figlabel">Figure 14.</span> GitHub &mdash; PAT-authenticated. <code>search_code</code> is bimodal &mdash; the slow tail and the run&rsquo;s only failures look consistent with rate-limit backoff.</figcaption>
   </figure>
   <p>
     <strong>Observation.</strong> <code>search_code</code> has a 554&nbsp;ms
-    average but a 1.56&nbsp;s p90 with 3 errors &mdash; suspected GitHub
-    API rate-limit throttling on the slow tail.
+    average but a 1.56&nbsp;s p90 with 3 errors &mdash; consistent with
+    GitHub API rate-limit throttling on the slow tail.
   </p>
   </section>
 
-  <!-- ===== Context7 ===== -->
   <section class="server-card">
   <figure class="perf-fig">
-<svg class="perf-svg" viewBox="0 0 800 246" role="img" aria-label="Context7User: handshake and tool calls performance from a 15-minute Azure Load Testing run.">
+<svg class="perf-svg" viewBox="0 0 800 246" role="img" aria-label="Context7User performance from a 15-minute Azure Load Testing run.">
   <text class="card-name" x="0" y="20">Context7User</text>
   <text class="card-sub"  x="110" y="20">617 requests &middot; 0 errors &middot; 5 VUs &middot; mcp.context7.com/mcp</text>
   <rect class="bar-avg" x="540" y="11" width="12" height="9"/><text class="legend-tx" x="558" y="20">avg</text>
@@ -2127,19 +2264,18 @@ $ Invoke-Item ./report/index.html</code></pre>
   <text class="col-hdr" x="265" y="231" text-anchor="end">calls</text>
   <text class="col-hdr" x="750" y="231" text-anchor="middle">err</text>
 </svg>
-    <figcaption>Doc retrieval is genuinely heavy work. The slowest tier, but predictable.</figcaption>
+    <figcaption><span class="figlabel">Figure 15.</span> Context7 &mdash; doc retrieval is genuinely heavy work. The slowest tier in this run, but predictable.</figcaption>
   </figure>
   <p>
     <strong>Observation.</strong> Both tool calls sit above 1&nbsp;s
-    average &mdash; suspected synchronous semantic-search / embedding
-    lookup on every request, with no caching layer.
+    average &mdash; consistent with a synchronous semantic-search /
+    embedding lookup on every request, with no caching layer.
   </p>
   </section>
 
-  <!-- ===== ADO Remote ===== -->
   <section class="server-card">
   <figure class="perf-fig">
-<svg class="perf-svg" viewBox="0 0 800 290" role="img" aria-label="ADOUser: handshake and tool calls performance from a 15-minute Azure Load Testing run.">
+<svg class="perf-svg" viewBox="0 0 800 290" role="img" aria-label="ADOUser performance from a 15-minute Azure Load Testing run.">
   <text class="card-name" x="0" y="20">ADOUser</text>
   <text class="card-sub"  x="70" y="20">649 requests &middot; 0 errors &middot; 5 VUs &middot; mcp.dev.azure.com/{org}</text>
   <rect class="bar-avg" x="540" y="11" width="12" height="9"/><text class="legend-tx" x="558" y="20">avg</text>
@@ -2205,19 +2341,183 @@ $ Invoke-Item ./report/index.html</code></pre>
   <text class="col-hdr" x="265" y="275" text-anchor="end">calls</text>
   <text class="col-hdr" x="750" y="275" text-anchor="middle">err</text>
 </svg>
-    <figcaption>Entra-authenticated, per-request bearer. The most consistent server &mdash; tight p90 spread.</figcaption>
+    <figcaption><span class="figlabel">Figure 16.</span> Azure DevOps Remote &mdash; Entra-authenticated, per-request bearer. The most consistent server in this run &mdash; tight p90 spread.</figcaption>
   </figure>
   <p>
     <strong>Observation.</strong> Handshake <code>initialize</code> is
-    335&nbsp;ms &mdash; the heaviest of the four, suspected to be Entra
+    335&nbsp;ms &mdash; the heaviest of the four, consistent with Entra
     bearer-token validation on every new session.
   </p>
+  </section>
+
+  <!-- ============ 9. DISCUSSION ============ -->
+  <h2 id="discussion"><span class="num">9.</span>Discussion</h2>
+
+  <h3>9.1 Latency signatures and what they may suggest</h3>
+  <p>
+    The four servers fall into three rough tiers. Microsoft Learn is
+    the fastest (sub-900&nbsp;ms p90 on both tools), which may reflect
+    cached, anonymous content delivery. The Azure DevOps Remote MCP
+    is the most consistent (a tight gap between average and p90
+    across all five tools), which may reflect a stable internal
+    service backed by deterministic queries. Context7 is the slowest
+    (over 1&nbsp;s on every call), which may reflect a synchronous
+    embedding lookup per request. GitHub sits in the middle, but
+    <code>search_code</code> is bimodal &mdash; a 2.8&times;
+    average-to-p90 ratio and the run's only failures &mdash; which
+    may reflect API-level rate limiting.
+  </p>
+
+  <h3>9.2 The handshake is not free</h3>
+  <p>
+    Cold-session cost varies tenfold across the four servers, from
+    44&nbsp;ms (Learn <code>tools/list</code>) to 335&nbsp;ms (ADO
+    <code>initialize</code>). For agents that open and close many
+    short-lived sessions, this overhead matters. The result argues for
+    session reuse where possible &mdash; though that is a property of
+    the agent runtime, not of MCP itself.
+  </p>
+
+  <h3>9.3 Limitations</h3>
+  <ul>
+    <li>
+      <strong>Single-engine run.</strong> The reported run uses one
+      Azure Load Testing engine instance. Higher concurrency
+      (engineInstances &gt; 1) was not exercised in this guide and
+      would be required to characterise saturation behaviour.
+    </li>
+    <li>
+      <strong>Modest VU count.</strong> Seventeen virtual users is a
+      smoke-grade workload, not a stress test. The numbers reported are
+      a baseline at light load, not a capacity ceiling.
+    </li>
+    <li>
+      <strong>Non-replayable third-party endpoints.</strong> Three of
+      the four servers are external services with their own rate
+      limits, terms of service, and operational variability. Numbers
+      reported here describe the state of those services on the run
+      date and should not be treated as service-level commitments.
+    </li>
+    <li>
+      <strong>Tools only.</strong> The harness exercises
+      <code>tools/call</code> exclusively. Resources and prompts use
+      the same wire format but were not measured.
+    </li>
+  </ul>
+
+  <h3>9.4 Operational considerations</h3>
+  <p>
+    Load testing third-party hosted MCP servers should be done with
+    permission and within the operator's published rate limits. The
+    targets used in this guide are public endpoints; the workload is
+    deliberately small; and any team replicating this work against
+    services they do not own should review terms of service first.
+  </p>
+
+  <!-- ============ 10. CONCLUSION ============ -->
+  <h2 id="conclusion"><span class="num">10.</span>Conclusion</h2>
+
+  <p>
+    A protocol-faithful load-testing harness for hosted MCP servers can
+    be built in a few hundred lines of Python on top of Locust. The
+    key design choices &mdash; a stateful/stateless split at the base
+    class, an auth hook that supports static and dynamic tokens, and a
+    response reader that handles both <code>application/json</code>
+    and <code>text/event-stream</code> &mdash; make the harness
+    portable across the hosted MCP servers exercised in this study and
+    plausibly across most others in the same shape.
+  </p>
+
+  <p>
+    The same project files run unchanged from a developer laptop and
+    from Azure Load Testing engines in the cloud, with secrets
+    resolved through Key Vault by managed identity at run time. The
+    run reported here surfaces distinct, interpretable latency
+    signatures across four production servers and demonstrates that
+    the harness is suitable both for development-time smoke checks and
+    for pass/fail gates in release pipelines via
+    <code>failureCriteria</code>.
+  </p>
+
+  <p>
+    Future work could extend the harness to cover the
+    <code>resources</code> and <code>prompts</code> primitives,
+    introduce ramp-and-soak workload profiles, and use multi-engine
+    fan-out to characterise saturation behaviour on production-scale
+    targets.
+  </p>
+
+  <!-- ============ REFERENCES ============ -->
+  <section class="references" id="references">
+    <h2>References</h2>
+    <ol>
+      <li>
+        Anthropic. <em>Model Context Protocol Specification</em>, version 2025-06-18.
+        <a href="https://modelcontextprotocol.io/specification" target="_blank" rel="noopener">modelcontextprotocol.io/specification</a>.
+      </li>
+      <li>
+        Locust contributors. <em>Locust — A modern load testing framework</em>.
+        <a href="https://docs.locust.io/" target="_blank" rel="noopener">docs.locust.io</a>.
+      </li>
+      <li>
+        Microsoft. <em>Azure Load Testing — documentation</em>.
+        <a href="https://learn.microsoft.com/azure/load-testing/" target="_blank" rel="noopener">learn.microsoft.com/azure/load-testing</a>.
+      </li>
+      <li>
+        Microsoft. <em>Microsoft Learn MCP server</em>. Endpoint:
+        <code>https://learn.microsoft.com/api/mcp</code>.
+      </li>
+      <li>
+        GitHub. <em>GitHub MCP server (hosted)</em>.
+        <a href="https://docs.github.com/en/copilot/customizing-copilot/extending-copilot-chat-with-mcp" target="_blank" rel="noopener">docs.github.com — MCP</a>.
+      </li>
+      <li>
+        Context7. <em>Context7 MCP server</em>.
+        <a href="https://context7.com" target="_blank" rel="noopener">context7.com</a>.
+      </li>
+      <li>
+        Microsoft. <em>Azure DevOps Remote MCP server (preview)</em>.
+        <a href="https://learn.microsoft.com/azure/devops/" target="_blank" rel="noopener">learn.microsoft.com/azure/devops</a>.
+      </li>
+      <li>
+        WHATWG. <em>HTML Living Standard — Server-Sent Events</em>.
+        <a href="https://html.spec.whatwg.org/multipage/server-sent-events.html" target="_blank" rel="noopener">html.spec.whatwg.org/server-sent-events</a>.
+      </li>
+      <li>
+        Microsoft. <em>Azure Key Vault and managed identities</em>.
+        <a href="https://learn.microsoft.com/azure/key-vault/" target="_blank" rel="noopener">learn.microsoft.com/azure/key-vault</a>.
+      </li>
+      <li>
+        K. Roy. <em>azure-load-test-mcp-server</em> (source repository).
+        <a href="https://github.com/kroy92/azure-load-test-mcp-server" target="_blank" rel="noopener">github.com/kroy92/azure-load-test-mcp-server</a>.
+      </li>
+    </ol>
+  </section>
+
+  <!-- ============ APPENDIX ============ -->
+  <section class="appendix" id="appendix">
+    <h2>Appendix A — Code Availability</h2>
+    <p>
+      All code, configuration, and the Azure Load Testing manifest
+      referenced in this guide are available under an open-source
+      licence at
+      <a href="https://github.com/kroy92/azure-load-test-mcp-server" target="_blank" rel="noopener">github.com/kroy92/azure-load-test-mcp-server</a>.
+      A frozen sample-report dashboard from the run reported in
+      &sect;8 is bundled with the repository for inspection.
+    </p>
+    <p>
+      The standalone single-server walkthrough script
+      (<code>learn_first.py</code>) is included verbatim in &sect;3 and
+      runs against the public Microsoft Learn MCP endpoint without
+      any credentials or further setup beyond
+      <code>pip&nbsp;install&nbsp;locust</code>.
+    </p>
   </section>
 
 </article>
 
 <footer class="post">
-  Built with Locust 2.43, Python 3.13, uv.
+  Built with Locust 2.43, Python 3.13, uv. Document version 1.0 — 9 May 2026.
 </footer>
 
 </body>

@@ -5,3 +5,7 @@ __pycache__/
 results/
 *.egg-info/
 .copilot-tracking/
+
+# Ignore all HTML in docs/ except the published guide
+docs/*.html
+!docs/Load Testing Hosted MCP Servers with Locust and Azure Load Testing.html

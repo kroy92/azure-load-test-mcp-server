@@ -9,3 +9,12 @@ results/
 # Ignore all HTML in docs/ except the published guide
 docs/*.html
 !docs/Load Testing Hosted MCP Servers with Locust and Azure Load Testing.html
+
+# Working drafts and helper scripts not for the public repo
+docs/*.md
+docs/figures/
+scripts/extract_html_figures.py
+scripts/extract_md_figures.py
+scripts/fig_ratios.py
+scripts/make_cover_banner.py
+scripts/strip_html_wrappers.py

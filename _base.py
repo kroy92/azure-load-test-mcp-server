@@ -54,6 +54,19 @@ def expect_contains(*needles: str, case_sensitive: bool = False) -> Callable[[di
     return _check
 
 
+def expect_any_contains(*needles: str, case_sensitive: bool = False) -> Callable[[dict], str | None]:
+    """Build an `expect=` that passes if any one of the needles appears in the text content."""
+    def _check(obj: dict) -> str | None:
+        text = tool_text(obj)
+        haystack = text if case_sensitive else text.lower()
+        for needle in needles:
+            n = needle if case_sensitive else needle.lower()
+            if n in haystack:
+                return None
+        return f"none of {needles!r} found in response (got {len(text)} chars)"
+    return _check
+
+
 def expect_not_empty(obj: dict) -> str | None:
     """Fail if the response has no text content and no structuredContent."""
     if tool_text(obj).strip():

@@ -11,7 +11,7 @@ import random
 
 from locust import task
 
-from _base import StatelessMCPUser, expect_not_empty, fixed_count_from_env, load_lines
+from _base import StatelessMCPUser, expect_any_contains, expect_contains, fixed_count_from_env, load_lines
 
 LIBRARIES = load_lines(
     "context7_libraries.txt",
@@ -29,6 +29,9 @@ TOPICS = load_lines(
         "how to handle errors",
     ],
 )
+
+_QUERY_DOCS = expect_any_contains("Source: ", "redirected to")
+_RESOLVE = expect_contains("Available Libraries:", "Context7-compatible library ID:")
 
 
 class Context7User(StatelessMCPUser):
@@ -51,7 +54,7 @@ class Context7User(StatelessMCPUser):
                 "libraryId": random.choice(LIBRARY_IDS),
                 "query": random.choice(TOPICS),
             },
-            expect=expect_not_empty,
+            expect=_QUERY_DOCS,
         )
 
     @task(1)
@@ -62,5 +65,5 @@ class Context7User(StatelessMCPUser):
                 "query": random.choice(TOPICS),
                 "libraryName": random.choice(LIBRARIES),
             },
-            expect=expect_not_empty,
+            expect=_RESOLVE,
         )

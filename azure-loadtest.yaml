@@ -1,6 +1,6 @@
 version: v0.1
 testId: mcp-multi-flat
-displayName: MCP multi-server cloud smoke (4 targets, flat layout)
+displayName: MCP multi-server cloud smoke (flat)
 description: GitHub + Learn + Context7 + ADO MCP smoke from one flat project.
 testPlan: multi.py
 testType: Locust
@@ -34,7 +34,7 @@ env:
   - name: LOCUST_SPAWN_RATE
     value: "5"
   - name: LOCUST_RUN_TIME
-    value: "240"
+    value: "900"
   - name: GITHUB_USERS
     value: "2"
   - name: LEARN_USERS
@@ -50,13 +50,13 @@ env:
   - name: MCP_TURN_PROB
     value: "0.2"
   - name: MCP_INTRA_MIN
-    value: "0.1"
-  - name: MCP_INTRA_MAX
     value: "0.5"
+  - name: MCP_INTRA_MAX
+    value: "2.0"
   - name: MCP_TURN_MIN
-    value: "5"
+    value: "8"
   - name: MCP_TURN_MAX
-    value: "30"
+    value: "45"
 
 # Secrets resolved from Key Vault at run time using ALT's system-assigned managed
 # identity (which has 'Key Vault Secrets User' on kv-mcpload-bd97).
@@ -65,6 +65,8 @@ secrets:
     value: https://kv-mcpload-bd97.vault.azure.net/secrets/github-mcp-token
   - name: ADO_MCP_TOKEN
     value: https://kv-mcpload-bd97.vault.azure.net/secrets/ado-mcp-token
+  - name: CONTEXT7_API_KEY
+    value: https://kv-mcpload-bd97.vault.azure.net/secrets/context7-api-key
 
 keyvaultReferenceIdentityType: SystemAssigned
 

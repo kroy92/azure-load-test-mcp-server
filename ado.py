@@ -24,7 +24,7 @@ from urllib.request import urlopen
 
 from locust import task
 
-from _base import StatelessMCPUser, expect_not_empty, fixed_count_from_env, load_lines
+from _base import StatelessMCPUser, expect_contains, fixed_count_from_env, load_lines
 
 ADO_ORG = os.environ.get("ADO_ORG", "")
 ADO_PROJECT = os.environ.get("ADO_PROJECT", "")
@@ -63,6 +63,12 @@ QUERIES = load_lines(
     default=["login error", "performance regression", "crash", "telemetry", "timeout"],
 )
 
+_WIT_GET = expect_contains('"id":', '"fields":')
+_WIT_MY = expect_contains('"url":"https://dev.azure.com/')
+_WIT_SEARCH = expect_contains('"count":', '"results":')
+_REPO_LIST = expect_contains('"isDisabled":')
+_BUILD_LIST = expect_contains('"buildNumber":')
+
 
 class ADOUser(StatelessMCPUser):
     host = "https://mcp.dev.azure.com"
@@ -94,7 +100,7 @@ class ADOUser(StatelessMCPUser):
         self._call(
             "wit_work_item",
             {"action": "get", "id": random.choice(BUG_IDS), "project": ADO_PROJECT},
-            expect=expect_not_empty,
+            expect=_WIT_GET,
         )
 
     @task(2)
@@ -102,7 +108,7 @@ class ADOUser(StatelessMCPUser):
         self._call(
             "wit_work_item",
             {"action": "my", "project": ADO_PROJECT, "type": "assignedtome", "top": 25},
-            expect=expect_not_empty,
+            expect=_WIT_MY,
         )
 
     @task(2)
@@ -110,7 +116,7 @@ class ADOUser(StatelessMCPUser):
         self._call(
             "search_workitem",
             {"searchText": random.choice(QUERIES), "project": [ADO_PROJECT], "top": 10},
-            expect=expect_not_empty,
+            expect=_WIT_SEARCH,
         )
 
     @task(2)
@@ -118,7 +124,7 @@ class ADOUser(StatelessMCPUser):
         self._call(
             "repo_repository",
             {"action": "list", "project": ADO_PROJECT, "top": 50},
-            expect=expect_not_empty,
+            expect=_REPO_LIST,
         )
 
     @task(1)
@@ -126,5 +132,5 @@ class ADOUser(StatelessMCPUser):
         self._call(
             "pipelines_build",
             {"action": "list", "project": ADO_PROJECT, "top": 25},
-            expect=expect_not_empty,
+            expect=_BUILD_LIST,
         )

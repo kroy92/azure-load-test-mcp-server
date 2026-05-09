@@ -13,7 +13,7 @@ import random
 
 from locust import task
 
-from _base import MCPUserBase, fixed_count_from_env, load_lines
+from _base import MCPUserBase, expect_contains, fixed_count_from_env, load_lines
 
 QUERIES = load_lines(
     "github_queries.txt",
@@ -44,6 +44,11 @@ REPOS = [
     ("github", "github-mcp-server"),
 ]
 
+_SEARCH_RESULT = expect_contains('"total_count"', '"items"')
+_FILE_OK = expect_contains("successfully downloaded")
+_LOGIN = expect_contains('"login":')
+_ISSUES = expect_contains('"issues":')
+
 
 class GitHubUser(MCPUserBase):
     host = "https://api.githubcopilot.com"
@@ -57,22 +62,22 @@ class GitHubUser(MCPUserBase):
 
     @task(3)
     def search_code(self) -> None:
-        self._call("search_code", {"query": random.choice(CODE_QUERIES)})
+        self._call("search_code", {"query": random.choice(CODE_QUERIES)}, expect=_SEARCH_RESULT)
 
     @task(2)
     def search_repos(self) -> None:
-        self._call("search_repositories", {"query": random.choice(QUERIES)})
+        self._call("search_repositories", {"query": random.choice(QUERIES)}, expect=_SEARCH_RESULT)
 
     @task(2)
     def get_file(self) -> None:
         owner, repo, path = random.choice(FILES)
-        self._call("get_file_contents", {"owner": owner, "repo": repo, "path": path})
+        self._call("get_file_contents", {"owner": owner, "repo": repo, "path": path}, expect=_FILE_OK)
 
     @task(1)
     def whoami(self) -> None:
-        self._call("get_me", {})
+        self._call("get_me", {}, expect=_LOGIN)
 
     @task(1)
     def list_issues(self) -> None:
         owner, repo = random.choice(REPOS)
-        self._call("list_issues", {"owner": owner, "repo": repo, "state": "OPEN"})
+        self._call("list_issues", {"owner": owner, "repo": repo, "state": "OPEN"}, expect=_ISSUES)

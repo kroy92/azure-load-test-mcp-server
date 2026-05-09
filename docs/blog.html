@@ -225,6 +225,9 @@
     display: block;
     margin: 0 auto;
   }
+  figure.diagram-wide svg {
+    max-width: 100%;
+  }
   figure.diagram figcaption {
     font-size: 14px;
     color: var(--fg-mute);
@@ -1181,343 +1184,111 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
   </figure>
 
   <!-- ============ SECTION 3 ============ -->
-  <h2 id="workload"><span class="num">3.</span>Designing the workload</h2>
+  <h2 id="auth"><span class="num">3.</span>Handling auth</h2>
 
   <p>
-    Each server has its own per-tool weighting via <code>@task(N)</code>,
-    plus a shared agent-shaped think-time model: 80% short
-    intra-turn pauses (0.1&ndash;0.5&nbsp;s) and 20% longer inter-turn
-    idles (5&ndash;30&nbsp;s). Together they shape what each virtual
-    user actually puts on the wire.
+    Before we generalise the script we need one more wrinkle:
+    different MCP servers authenticate differently. Three patterns
+    cover all four targets, and each one stays a one- or two-line
+    change on the user class.
   </p>
 
-  <h3>Microsoft Learn &mdash; 2 tools, equal weight</h3>
-  <figure class="diagram">
-    <svg viewBox="0 0 720 200" role="img"
-         aria-label="Microsoft Learn tool weights: microsoft_docs_search 50%, microsoft_code_sample_search 50%.">
-      <style>
-        .bar-bg    { fill: #f5f3ef; stroke: #e7e3dc; }
-        .bar-fill  { fill: #2b6cb0; }
-        .bar-label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
-        .bar-pct   { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
-        .title     { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
-      </style>
-      <text class="title" x="20" y="30">tool                                    weight</text>
+  <h3>Pattern A &mdash; no auth (Learn, Context7)</h3>
+  <p>
+    The endpoint is public. Nothing to set. The class doesn&rsquo;t
+    declare an <code>auth_headers</code> attribute at all and the base
+    sends the standard MCP headers untouched.
+  </p>
 
-      <text class="bar-label" x="20"  y="80">microsoft_docs_search</text>
-      <rect class="bar-bg"   x="280" y="62" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="62" width="190" height="22"/>
-      <text class="bar-pct"  x="670" y="80" text-anchor="end">50%</text>
+  <h3>Pattern B &mdash; static bearer from env (GitHub)</h3>
+  <p>
+    The token lives in <code>GITHUB_MCP_TOKEN</code> (a fine-grained PAT
+    locally, a Key Vault reference in Azure Load Testing). It&rsquo;s
+    read once at import time and stamped on every request via the class
+    attribute:
+  </p>
 
-      <text class="bar-label" x="20"  y="140">microsoft_code_sample_search</text>
-      <rect class="bar-bg"   x="280" y="122" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="122" width="190" height="22"/>
-      <text class="bar-pct"  x="670" y="140" text-anchor="end">50%</text>
-    </svg>
-  </figure>
+  <pre><code>class GitHubUser(MCPUserBase):
+    auth_headers = {
+        "Authorization": f"Bearer {os.environ.get('GITHUB_MCP_TOKEN', '')}",
+    }</code></pre>
 
-  <h3>GitHub &mdash; 5 tools, search-heavy</h3>
-  <figure class="diagram">
-    <svg viewBox="0 0 720 320" role="img"
-         aria-label="GitHub MCP tool weights: search_code 33%, search_repositories 22%, get_file_contents 22%, get_me 11%, list_issues 11%.">
-      <style>
-        .bar-bg    { fill: #f5f3ef; stroke: #e7e3dc; }
-        .bar-fill  { fill: #2b6cb0; }
-        .bar-label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
-        .bar-pct   { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
-        .title     { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
-      </style>
-      <text class="title" x="20" y="30">tool                                    weight</text>
+  <h3>Pattern C &mdash; dynamic token per request (ADO Remote)</h3>
+  <p>
+    Azure DevOps tokens expire roughly every hour, so a static value
+    won&rsquo;t survive a long run. The class overrides
+    <code>_extra_headers()</code> &mdash; a hook the base calls before
+    every POST &mdash; and mints a fresh token on demand:
+  </p>
 
-      <text class="bar-label" x="20"  y="68">search_code</text>
-      <rect class="bar-bg"   x="280" y="50" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="50" width="125" height="22"/>
-      <text class="bar-pct"  x="670" y="68" text-anchor="end">33%</text>
+  <pre><code>class ADOUser(StatelessMCPUser):
+    auth_headers = {"X-MCP-Readonly": "true"}
 
-      <text class="bar-label" x="20"  y="118">search_repositories</text>
-      <rect class="bar-bg"   x="280" y="100" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="100" width="84" height="22"/>
-      <text class="bar-pct"  x="670" y="118" text-anchor="end">22%</text>
-
-      <text class="bar-label" x="20"  y="168">get_file_contents</text>
-      <rect class="bar-bg"   x="280" y="150" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="150" width="84" height="22"/>
-      <text class="bar-pct"  x="670" y="168" text-anchor="end">22%</text>
-
-      <text class="bar-label" x="20"  y="218">get_me</text>
-      <rect class="bar-bg"   x="280" y="200" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="200" width="42" height="22"/>
-      <text class="bar-pct"  x="670" y="218" text-anchor="end">11%</text>
-
-      <text class="bar-label" x="20"  y="268">list_issues</text>
-      <rect class="bar-bg"   x="280" y="250" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="250" width="42" height="22"/>
-      <text class="bar-pct"  x="670" y="268" text-anchor="end">11%</text>
-    </svg>
-  </figure>
-
-  <h3>Context7 &mdash; 2 tools, 75/25</h3>
-  <figure class="diagram">
-    <svg viewBox="0 0 720 200" role="img"
-         aria-label="Context7 tool weights: query-docs 75%, resolve-library-id 25%.">
-      <style>
-        .bar-bg    { fill: #f5f3ef; stroke: #e7e3dc; }
-        .bar-fill  { fill: #2b6cb0; }
-        .bar-label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
-        .bar-pct   { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
-        .title     { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
-      </style>
-      <text class="title" x="20" y="30">tool                                    weight</text>
-
-      <text class="bar-label" x="20"  y="80">query-docs</text>
-      <rect class="bar-bg"   x="280" y="62" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="62" width="285" height="22"/>
-      <text class="bar-pct"  x="670" y="80" text-anchor="end">75%</text>
-
-      <text class="bar-label" x="20"  y="140">resolve-library-id</text>
-      <rect class="bar-bg"   x="280" y="122" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="122" width="95" height="22"/>
-      <text class="bar-pct"  x="670" y="140" text-anchor="end">25%</text>
-    </svg>
-  </figure>
-
-  <h3>Azure DevOps Remote &mdash; 5 tools, work-item heavy</h3>
-  <figure class="diagram">
-    <svg viewBox="0 0 720 320" role="img"
-         aria-label="Azure DevOps Remote MCP tool weights: wit_work_item:get 30%, wit_work_item:my 20%, search_workitem 20%, repo_repository 20%, pipelines_build 10%.">
-      <style>
-        .bar-bg    { fill: #f5f3ef; stroke: #e7e3dc; }
-        .bar-fill  { fill: #2b6cb0; }
-        .bar-label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
-        .bar-pct   { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
-        .title     { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
-      </style>
-      <text class="title" x="20" y="30">tool                                    weight</text>
-
-      <text class="bar-label" x="20"  y="68">wit_work_item:get</text>
-      <rect class="bar-bg"   x="280" y="50" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="50" width="114" height="22"/>
-      <text class="bar-pct"  x="670" y="68" text-anchor="end">30%</text>
-
-      <text class="bar-label" x="20"  y="118">wit_work_item:my</text>
-      <rect class="bar-bg"   x="280" y="100" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="100" width="76" height="22"/>
-      <text class="bar-pct"  x="670" y="118" text-anchor="end">20%</text>
-
-      <text class="bar-label" x="20"  y="168">search_workitem</text>
-      <rect class="bar-bg"   x="280" y="150" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="150" width="76" height="22"/>
-      <text class="bar-pct"  x="670" y="168" text-anchor="end">20%</text>
-
-      <text class="bar-label" x="20"  y="218">repo_repository</text>
-      <rect class="bar-bg"   x="280" y="200" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="200" width="76" height="22"/>
-      <text class="bar-pct"  x="670" y="218" text-anchor="end">20%</text>
-
-      <text class="bar-label" x="20"  y="268">pipelines_build</text>
-      <rect class="bar-bg"   x="280" y="250" width="380" height="22"/>
-      <rect class="bar-fill" x="280" y="250" width="38" height="22"/>
-      <text class="bar-pct"  x="670" y="268" text-anchor="end">10%</text>
-    </svg>
-  </figure>
+    def _extra_headers(self) -&gt; dict[str, str]:
+        return {
+            **self.auth_headers,
+            "Authorization": f"Bearer {_get_ado_token()}",
+        }</code></pre>
 
   <p>
-    Each class also declares <code>fixed_count</code>, the number of
-    virtual users Locust spawns for it. The defaults add up to 17, which
-    matches <code>users = 17</code> in <code>locust.conf</code>:
+    Locally <code>_get_ado_token()</code> is backed by
+    <code>DefaultAzureCredential</code> (cached <code>az login</code>);
+    the SDK auto-refreshes. In Azure Load Testing the same function
+    short-circuits to a pre-minted token injected from Key Vault. The
+    user class doesn&rsquo;t care which mode is active.
   </p>
 
-  <table>
-    <thead>
-      <tr><th>Class</th><th>Env var</th><th>Default VUs</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>LearnUser</td><td><code>LEARN_USERS</code></td><td>5</td></tr>
-      <tr><td>GitHubUser</td><td><code>GITHUB_USERS</code></td><td>2</td></tr>
-      <tr><td>Context7User</td><td><code>CONTEXT7_USERS</code></td><td>5</td></tr>
-      <tr><td>ADOUser</td><td><code>ADO_USERS</code></td><td>5</td></tr>
-      <tr><td><strong>Total</strong></td><td></td><td><strong>17</strong></td></tr>
-    </tbody>
-  </table>
+  <p>
+    That&rsquo;s the whole auth surface: one class attribute for static
+    headers, one method override for dynamic ones. Everything else
+    &mdash; sessions, retries, timing &mdash; lives in the base, which
+    is the next section.
+  </p>
 
   <!-- ============ SECTION 4 ============ -->
-  <h2 id="run"><span class="num">4.</span>Running the test</h2>
+  <h2 id="framework"><span class="num">4.</span>Framework</h2>
+
+  <div class="callout good">
+    <strong>Grab the code</strong>
+    <p>
+      Everything in this section &mdash; <code>_base.py</code>,
+      <code>learn.py</code>, <code>github.py</code>, <code>context7.py</code>,
+      <code>ado.py</code>, <code>multi.py</code>, <code>locust.conf</code>,
+      and the Azure Load Testing YAML &mdash; lives in the public repo:
+      <a href="https://github.com/kroy92/azure-load-test-mcp-server"
+         target="_blank" rel="noopener">github.com/kroy92/azure-load-test-mcp-server</a>.
+      Clone it and follow along.
+    </p>
+  </div>
 
   <p>
-    One server at a time first &mdash; that's the smoke. Switch
-    <code>-f learn.py</code> for <code>-f multi.py</code> to fan out the
-    full 17-VU mix across all four servers in one process.
-  </p>
-
-  <pre><code>$ uv run locust -f learn.py --headless -u 5 -r 1 -t 60s
-
-[2026-05-09 09:14:01] Starting Locust 2.43.0
-[2026-05-09 09:14:01] Spawning 5 users at 1.00 users/s
-
- Type   Name                                          # reqs   # fails  Avg     Min     Max     Med  | req/s  failures/s
---------------------------------------------------------------------------------------------------------------------
- POST   learn:initialize                                   5         0  1404     755    1884   1600  |  0.10        0.00
- POST   learn:notifications/initialized                    5         0   629     271     743    710  |  0.10        0.00
- POST   learn:tools/list                                   5         0   424     387     514    390  |  0.10        0.00
- POST   learn:tools/call:microsoft_docs_search           28         0   800     551    1346    690  |  0.61        0.00
- POST   learn:tools/call:microsoft_code_sample_search    21         0   779     520    1351    730  |  0.46        0.00
- DELETE learn:DELETE                                       4         0   285     260     326    270  |  0.09        0.00
---------------------------------------------------------------------------------------------------------------------
-        Aggregated                                       68         0   713     260    1884    700  |  1.46        0.00</code></pre>
-
-  <p>
-    Six rows tell the whole story: the handshake, the tools/list
-    discovery, the two tool calls under load, and the polite DELETE on
-    shutdown. Same shape repeats for every server &mdash;
-    <code>multi.py</code> just runs four of them at once.
-  </p>
-
-  <!-- ============ SECTION 5 ============ -->
-  <h2 id="results"><span class="num">5.</span>Results</h2>
-
-  <p>
-    A four-minute smoke at 17 VUs &mdash; 5 Learn, 2 GitHub, 5 Context7,
-    5 ADO &mdash; against the live, public endpoints. Every number
-    below comes straight from <code>results/smoke_stats.csv</code>; the
-    table aggregates each server's <code>tools/call</code> rows.
-  </p>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Server</th>
-        <th>Calls</th>
-        <th>p50</th>
-        <th>p95</th>
-        <th>Max</th>
-        <th>Errors</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>Learn</td>        <td>49</td><td>700&nbsp;ms</td><td>1.2&nbsp;s</td><td>1.4&nbsp;s</td><td>0</td></tr>
-      <tr><td>Context7</td>     <td>40</td><td>320&nbsp;ms</td><td>445&nbsp;ms</td><td>465&nbsp;ms</td><td>0</td></tr>
-      <tr><td>GitHub</td>       <td>14</td><td>1.4&nbsp;s</td><td>5.6&nbsp;s</td><td>5.6&nbsp;s</td><td>0</td></tr>
-      <tr><td>ADO Remote</td>   <td>46</td><td>510&nbsp;ms</td><td>2.0&nbsp;s</td><td>2.8&nbsp;s</td><td>0</td></tr>
-      <tr>
-        <td><strong>Aggregate (all requests)</strong></td>
-        <td><strong>206</strong></td>
-        <td><strong>580&nbsp;ms</strong></td>
-        <td><strong>2.6&nbsp;s</strong></td>
-        <td><strong>5.6&nbsp;s</strong></td>
-        <td><strong>0&nbsp;/&nbsp;4.5&nbsp;RPS</strong></td>
-      </tr>
-    </tbody>
-  </table>
-
-  <figure class="diagram">
-    <svg viewBox="0 0 720 320" role="img"
-         aria-label="Grouped bar chart comparing p50 and p95 response times in milliseconds across Learn, Context7, GitHub, and ADO Remote.">
-      <style>
-        .axis      { stroke: #6b6b6b; stroke-width: 1; }
-        .grid      { stroke: #e7e3dc; stroke-width: 1; }
-        .tick      { font: 11px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
-        .cat       { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #1a1a1a; }
-        .p50       { fill: #2b6cb0; }
-        .p95       { fill: #b25a00; }
-        .legend-tx { font: 13px -apple-system, "Segoe UI", sans-serif; fill: #1a1a1a; }
-        .barval    { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #1a1a1a; }
-      </style>
-
-      <!-- legend -->
-      <rect class="p50" x="450" y="20" width="14" height="14"/>
-      <text class="legend-tx" x="470" y="32">p50</text>
-      <rect class="p95" x="540" y="20" width="14" height="14"/>
-      <text class="legend-tx" x="560" y="32">p95</text>
-
-      <!-- Y axis: 0..6000 ms -->
-      <line class="axis" x1="60" y1="60" x2="60" y2="270"/>
-      <line class="grid" x1="60" y1="60"  x2="700" y2="60"/>
-      <line class="grid" x1="60" y1="130" x2="700" y2="130"/>
-      <line class="grid" x1="60" y1="200" x2="700" y2="200"/>
-      <line class="axis" x1="60" y1="270" x2="700" y2="270"/>
-      <text class="tick" x="55" y="64"  text-anchor="end">6000 ms</text>
-      <text class="tick" x="55" y="134" text-anchor="end">4000 ms</text>
-      <text class="tick" x="55" y="204" text-anchor="end">2000 ms</text>
-      <text class="tick" x="55" y="274" text-anchor="end">0</text>
-
-      <!-- bar groups: each group 140 wide, two bars 28 wide, 8 gap. Scale: 210 px = 6000 ms -->
-      <!-- Learn: p50 700, p95 1200 -->
-      <g transform="translate(110 0)">
-        <rect class="p50" x="0"  y="245.5" width="28" height="24.5"/>
-        <rect class="p95" x="36" y="228"   width="28" height="42"/>
-        <text class="barval" x="14" y="240" text-anchor="middle">700</text>
-        <text class="barval" x="50" y="222" text-anchor="middle">1200</text>
-        <text class="cat"    x="32" y="290" text-anchor="middle">Learn</text>
-      </g>
-
-      <!-- Context7: p50 320, p95 445 -->
-      <g transform="translate(260 0)">
-        <rect class="p50" x="0"  y="258.8" width="28" height="11.2"/>
-        <rect class="p95" x="36" y="254.4" width="28" height="15.6"/>
-        <text class="barval" x="14" y="253" text-anchor="middle">320</text>
-        <text class="barval" x="50" y="248" text-anchor="middle">445</text>
-        <text class="cat"    x="32" y="290" text-anchor="middle">Context7</text>
-      </g>
-
-      <!-- GitHub: p50 1400, p95 5600 -->
-      <g transform="translate(410 0)">
-        <rect class="p50" x="0"  y="221"  width="28" height="49"/>
-        <rect class="p95" x="36" y="74"   width="28" height="196"/>
-        <text class="barval" x="14" y="215" text-anchor="middle">1400</text>
-        <text class="barval" x="50" y="68"  text-anchor="middle">5600</text>
-        <text class="cat"    x="32" y="290" text-anchor="middle">GitHub</text>
-      </g>
-
-      <!-- ADO Remote: p50 510, p95 2000 -->
-      <g transform="translate(560 0)">
-        <rect class="p50" x="0"  y="252.2" width="28" height="17.8"/>
-        <rect class="p95" x="36" y="200"   width="28" height="70"/>
-        <text class="barval" x="14" y="246" text-anchor="middle">510</text>
-        <text class="barval" x="50" y="194" text-anchor="middle">2000</text>
-        <text class="cat"    x="32" y="290" text-anchor="middle">ADO Remote</text>
-      </g>
-    </svg>
-    <figcaption>p50 vs p95 by server. Learn and ADO sit in the same band; GitHub's p95 is dragged up by <code>search_code</code>.</figcaption>
-  </figure>
-
-  <p class="callout warn">
-    <strong>One-time warm-up cost.</strong>
-    First-contact <code>initialize</code> handshakes ranged from
-    1.4&nbsp;s (Learn) to 3.0&nbsp;s (Context7) and 2.7&nbsp;s
-    (GitHub). They run once per VU per session, so they show up in the
-    table above but they're not steady-state &mdash; the
-    <code>tools/call</code> rows are.
-  </p>
-
-  <!-- ============ SECTION 6 ============ -->
-  <h2 id="framework"><span class="num">6.</span>From script to reusable framework</h2>
-
-  <p>
-    Every server we tested does that same five-block dance. Initialize,
-    notify, list, call, delete &mdash; only the host, the tool names,
-    and (for some) the auth header change. So we lifted the wire
-    plumbing into <code>_base.py</code> and let each per-server file
-    keep just the bits that actually differ.
+    <code>learn_first.py</code> works, but every other MCP server we want
+    to test does the same five-block dance &mdash; initialize, notify,
+    list, call, delete. Only the host, the tool names, and (for some)
+    the auth header change. So we lifted the wire plumbing into a
+    shared base class and let each per-server file keep just the bits
+    that actually differ.
   </p>
 
   <p>
-    <code>MCPUserBase</code> owns the life cycle from §2:
-    <code>on_start</code> runs <code>_initialize</code>,
-    <code>_notify_initialized</code>, <code>_tools_list</code>;
+    <code>MCPUserBase</code> in <code>_base.py</code> owns the life
+    cycle: <code>on_start</code> runs <code>_initialize</code>,
+    <code>_notify_initialized</code>, and <code>_tools_list</code>;
     <code>on_stop</code> runs <code>_terminate_session</code>;
     <code>_call</code> wraps <code>_jsonrpc</code> for every
     <code>tools/call</code>; <code>wait_time</code> implements the
-    80/20 agent-shaped think time; <code>_extra_headers</code> is the
+    agent-shaped 80/20 think time; <code>_extra_headers</code> is the
     hook subclasses override to mint auth tokens. Stateful servers
-    (Learn, GitHub) inherit it directly. Stateless servers (Context7,
-    ADO Remote) go through <code>StatelessMCPUser</code>, which just
-    flips <code>requires_session = False</code> so the DELETE step is a
+    (Learn, GitHub) inherit <code>MCPUserBase</code> directly.
+    Stateless servers (Context7, ADO Remote) go through
+    <code>StatelessMCPUser</code>, which just flips
+    <code>requires_session = False</code> so the DELETE step is a
     no-op. Each leaf class is then a handful of <code>@task</code>
     methods.
   </p>
 
-  <figure class="diagram">
-    <svg viewBox="0 0 760 480" role="img"
+  <figure class="diagram diagram-wide">
+    <svg viewBox="0 0 900 480" role="img"
          aria-label="Class hierarchy: MCPUserBase has two stateful children (LearnUser, GitHubUser) and one intermediate child (StatelessMCPUser), which in turn has two children (Context7User, ADOUser).">
       <style>
         .cls-base    { fill: #ebf3fb; stroke: #2b6cb0; stroke-width: 1.6; }
@@ -1530,7 +1301,7 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
         .inh         { stroke: #6b6b6b; stroke-width: 1.4; fill: none; }
       </style>
       <defs>
-        <marker id="s6inh" viewBox="0 0 12 12" refX="6" refY="6"
+        <marker id="s3inh" viewBox="0 0 12 12" refX="6" refY="6"
                 markerWidth="11" markerHeight="11" orient="auto">
           <path d="M0,0 L12,6 L0,12 z" fill="#fff" stroke="#6b6b6b" stroke-width="1.2"/>
         </marker>
@@ -1609,80 +1380,564 @@ python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
       </g>
 
       <!-- ===== inheritance arrows (open triangle to parent) ===== -->
-      <!-- LearnUser -> MCPUserBase -->
-      <path class="inh" d="M120,280 L120,240 L380,240 L380,206" marker-end="url(#s6inh)"/>
-      <!-- GitHubUser -> MCPUserBase -->
-      <path class="inh" d="M340,280 L340,206" marker-end="url(#s6inh)"/>
-      <!-- StatelessMCPUser -> MCPUserBase -->
-      <path class="inh" d="M640,120 L640,90 L520,90 L520,70" marker-end="url(#s6inh)"/>
-      <!-- Context7User -> StatelessMCPUser -->
-      <path class="inh" d="M560,320 L560,260 L640,260 L640,206" marker-end="url(#s6inh)"/>
-      <!-- ADOUser -> StatelessMCPUser -->
-      <path class="inh" d="M780,280 L780,230 L640,230 L640,206" marker-end="url(#s6inh)"/>
+      <path class="inh" d="M120,280 L120,240 L380,240 L380,206" marker-end="url(#s3inh)"/>
+      <path class="inh" d="M340,280 L340,206" marker-end="url(#s3inh)"/>
+      <path class="inh" d="M640,120 L640,90 L520,90 L520,70" marker-end="url(#s3inh)"/>
+      <path class="inh" d="M560,320 L560,260 L640,260 L640,206" marker-end="url(#s3inh)"/>
+      <path class="inh" d="M780,280 L780,230 L640,230 L640,206" marker-end="url(#s3inh)"/>
     </svg>
     <figcaption>The factoring. Hollow arrows point at the parent class. Stateful servers inherit <code>MCPUserBase</code> directly; stateless servers route through <code>StatelessMCPUser</code> to skip the DELETE step.</figcaption>
   </figure>
 
   <p>
-    With that base in place, <code>learn.py</code> shrinks from the
-    ~120 lines of §2 to about 45 &mdash; a list of queries, the five
-    config constants, two <code>@task</code> methods. The other three
-    per-server files have the same shape. <code>multi.py</code> is
-    twenty lines of imports; Locust loads each <code>User</code>
-    subclass and spawns its declared <code>fixed_count</code>, so one
-    process drives all four servers in parallel. The same files run
-    unchanged in Azure Load Testing via
-    <code>azure-loadtest.yaml</code> &mdash; the engines just need the
-    same env vars.
+    With that base in place, each per-server file is a list of
+    queries, five config constants, and a handful of
+    <code>@task</code> methods. <code>multi.py</code> is twenty lines
+    of imports; Locust loads each <code>User</code> subclass and
+    spawns its declared <code>fixed_count</code>, so one process drives
+    all four servers in parallel. The same files run unchanged in
+    Azure Load Testing via <code>azure-loadtest.yaml</code> &mdash;
+    the engines just need the same env vars.
   </p>
 
-  <figure class="diagram">
-    <svg viewBox="0 0 720 160" role="img"
-         aria-label="Three boxes connected by arrows: per-server scripts feed into the shared base, which runs in either local Locust or Azure Load Testing.">
+  <!-- ============ SECTION 5 ============ -->
+  <h2 id="everywhere"><span class="num">5.</span>One process, four servers &mdash; locally and in the cloud</h2>
+
+  <p>
+    Four user classes, but we want one Locust process driving all of
+    them &mdash; and we want the same files to run in Azure Load
+    Testing without edits. <code>multi.py</code> is the entrypoint.
+    It&rsquo;s twenty lines of imports; Locust discovers each
+    <code>User</code> subclass and spawns its declared
+    <code>fixed_count</code>:
+  </p>
+
+  <pre><code>from ado import ADOUser            # noqa: F401
+from context7 import Context7User  # noqa: F401
+from github import GitHubUser      # noqa: F401
+from learn import LearnUser        # noqa: F401</code></pre>
+
+  <p>
+    The four <code>fixed_count</code> values must sum to
+    <code>users</code> in <code>locust.conf</code> (default 2 + 5 + 5 +
+    5 = 17), otherwise Locust warns and rebalances. Run it locally:
+  </p>
+
+  <pre><code>$ uv run locust -f multi.py --config locust.conf</code></pre>
+
+  <p>
+    Same files, no changes &mdash; ship them to <strong>Azure Load
+    Testing</strong> through a one-page YAML. ALT uploads the project,
+    spins up engine VMs (1–45), runs the same
+    <code>locust -f multi.py</code> behind the scenes, and streams
+    results back to a portal dashboard:
+  </p>
+
+  <pre><code>version: v0.1
+testId: mcp-multi-flat
+displayName: MCP multi-server cloud smoke
+testPlan: multi.py
+testType: Locust
+engineInstances: 1
+
+configurationFiles:
+  - _base.py
+  - mcp_client.py
+  - github.py
+  - learn.py
+  - context7.py
+  - ado.py
+  - requirements.txt
+  # … plus query data files
+
+properties:
+  userPropertyFile: locust.conf
+
+env:
+  - { name: LOCUST_USERS,    value: "17" }
+  - { name: GITHUB_USERS,    value: "2"  }
+  - { name: LEARN_USERS,     value: "5"  }
+  - { name: CONTEXT7_USERS,  value: "5"  }
+  - { name: ADO_USERS,       value: "5"  }
+  - { name: ADO_ORG,         value: "krishnaroy" }
+  - { name: ADO_PROJECT,     value: "learn" }
+
+# Bearer tokens stay in Key Vault; ALT&rsquo;s system-assigned identity
+# resolves them at run time and injects as env vars.
+secrets:
+  - { name: GITHUB_MCP_TOKEN,  value: https://kv-mcpload-bd97.vault.azure.net/secrets/github-mcp-token }
+  - { name: ADO_MCP_TOKEN,     value: https://kv-mcpload-bd97.vault.azure.net/secrets/ado-mcp-token }
+  - { name: CONTEXT7_API_KEY,  value: https://kv-mcpload-bd97.vault.azure.net/secrets/context7-api-key }
+
+failureCriteria:
+  - avg(response_time_ms) &gt; 8000
+  - percentage(error) &gt; 25</code></pre>
+
+  <p>
+    Submit it with the Azure CLI. ALT pulls the secrets from Key Vault
+    via its system-assigned identity at run time, so the only thing
+    you need locally is an <code>az&nbsp;login</code> against the
+    subscription that owns the load-testing resource:
+  </p>
+
+  <pre><code>$ az login
+$ az load test update \
+    --load-test-resource &lt;your-loadtest-resource&gt; \
+    --resource-group &lt;your-rg&gt; \
+    --test-id mcp-multi-flat \
+    --load-test-config-file azure-loadtest.yaml
+$ az load test-run create \
+    --load-test-resource &lt;your-loadtest-resource&gt; \
+    --resource-group &lt;your-rg&gt; \
+    --test-id mcp-multi-flat \
+    --test-run-id run-$(Get-Date -Format yyyyMMdd-HHmmss) \
+    --no-wait</code></pre>
+
+  <p>
+    One wrinkle worth calling out: the ADO Remote MCP server uses
+    Entra&nbsp;ID and its tokens expire in about an hour. If your
+    Azure DevOps organisation lives in a different tenant from the
+    subscription that hosts ALT, before each run you need to
+    <code>az&nbsp;login</code> against the ADO tenant, request an
+    access token for the Azure DevOps resource, and write it to the
+    <code>ado-mcp-token</code> Key Vault secret. Same tenant for both?
+    Skip it entirely &mdash; when you run Locust on your laptop your
+    <code>az&nbsp;login</code> reads the secrets from Key Vault, and
+    when ALT runs the test in the cloud the load-test resource's
+    managed identity does the same thing.
+  </p>
+
+  <p>
+    Three things keep this honest. <strong>Auth</strong>: secrets never
+    leave Key Vault &mdash; ALT pulls them via managed identity and the
+    user classes read the same env-var names locally and in cloud.
+    <strong>Failure criteria</strong> turn the YAML into a pass/fail
+    gate suitable for a release pipeline. <strong>Engine count</strong>
+    is the only knob that changes when you scale: bump
+    <code>engineInstances</code> to spread the same VU mix across more
+    workers.
+  </p>
+
+  <!-- ============ SECTION 6 ============ -->
+  <h2 id="workload"><span class="num">6.</span>Running a demo test</h2>
+
+  <p>
+    Same four files, real endpoints. Before we look at the run output,
+    here&rsquo;s what one Locust process actually puts on the wire when
+    you launch it.
+  </p>
+
+  <h3>Workload model</h3>
+
+  <p>
+    Seventeen virtual users split four ways, each VU picking tools from
+    its server&rsquo;s <code>@task</code> weights, paced by the
+    agent-shaped think time (80% short intra-turn pauses
+    0.1&ndash;0.5&nbsp;s, 20% inter-turn idles 5&ndash;30&nbsp;s).
+  </p>
+
+  <figure class="diagram diagram-wide">
+    <svg viewBox="0 0 900 720" role="img"
+         aria-label="One Locust process drives four MCP servers. 5 VUs go to Microsoft Learn (microsoft_docs_search 50%, microsoft_code_sample_search 50%); 2 VUs go to GitHub (search_code 33%, search_repositories 22%, get_file_contents 22%, get_me 11%, list_issues 11%); 5 VUs go to Context7 (query-docs 75%, resolve-library-id 25%); 5 VUs go to Azure DevOps Remote (wit_work_item:get 30%, wit_work_item:my 20%, search_workitem 20%, repo_repository 20%, pipelines_build 10%).">
       <style>
-        .box-s   { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1.4; }
-        .box-c   { fill: #ebf3fb; stroke: #5586b3; stroke-width: 1.4; }
-        .box-r   { fill: #fff4e5; stroke: #b25a00; stroke-width: 1.4; }
-        .bx-tx   { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
-        .bx-sub  { font: 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
-        .arrow   { stroke: #6b6b6b; stroke-width: 1.4; fill: none; }
+        .src        { fill: #fff8e6; stroke: #b25a00; stroke-width: 1.6; }
+        .src-name   { font: 700 16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .src-sub    { font: italic 12px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+        .src-vu     { font: 700 22px -apple-system, "Segoe UI", sans-serif; fill: #b25a00; }
+        .src-vutag  { font: 11px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+
+        .card       { fill: #fbfaf6; stroke: #5586b3; stroke-width: 1.4; }
+        .card-gh    { stroke: #1f2937; }
+        .card-c7    { stroke: #b25a00; }
+        .card-ado   { stroke: #2b6cb0; }
+
+        .srv-name   { font: 700 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .srv-host   { font: italic 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6b6b6b; }
+        .vu-badge   { fill: #ebf3fb; stroke: #5586b3; stroke-width: 1; }
+        .vu-badge-gh   { fill: #f3f4f6; stroke: #1f2937; }
+        .vu-badge-c7   { fill: #fff4e5; stroke: #b25a00; }
+        .vu-badge-ado  { fill: #ebf3fb; stroke: #2b6cb0; }
+        .vu-badge-tx{ font: 700 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+
+        .tool-name  { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .task-tag   { font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6b6b6b; }
+        .bar-bg     { fill: #f5f3ef; stroke: #e7e3dc; }
+        .bar-fill   { fill: #5586b3; }
+        .bar-gh     { fill: #1f2937; }
+        .bar-c7     { fill: #b25a00; }
+        .bar-ado    { fill: #2b6cb0; }
+        .bar-pct    { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
+
+        .arrow      { stroke: #6b6b6b; stroke-width: 1.6; fill: none; }
+        .arrow-tx   { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
+        .arrow-pill { fill: #ffffff; stroke: #cfd6df; stroke-width: 1; }
       </style>
       <defs>
-        <marker id="s6arr" viewBox="0 0 10 10" refX="8" refY="5"
-                markerWidth="7" markerHeight="7" orient="auto">
+        <marker id="wlarr" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="8" markerHeight="8" orient="auto">
           <path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/>
         </marker>
       </defs>
 
-      <rect class="box-s" x="20"  y="40" width="200" height="80" rx="8"/>
-      <text class="bx-tx"  x="120" y="72" text-anchor="middle">learn.py</text>
-      <text class="bx-tx"  x="120" y="90" text-anchor="middle">github.py</text>
-      <text class="bx-sub" x="120" y="108" text-anchor="middle">context7.py · ado.py</text>
+      <!-- ============ source: Locust ============ -->
+      <g>
+        <rect class="src" x="20" y="280" width="190" height="170" rx="10"/>
+        <text class="src-name" x="115" y="315" text-anchor="middle">Locust</text>
+        <text class="src-sub"  x="115" y="335" text-anchor="middle">multi.py</text>
+        <text class="src-vu"   x="115" y="385" text-anchor="middle">17</text>
+        <text class="src-vutag" x="115" y="403" text-anchor="middle">virtual users</text>
+        <text class="src-vutag" x="115" y="428" text-anchor="middle" style="font-family: ui-monospace, Menlo, Consolas, monospace; fill:#b25a00;">users = 17</text>
+      </g>
 
-      <rect class="box-c" x="270" y="40" width="180" height="80" rx="8"/>
-      <text class="bx-tx"  x="360" y="78" text-anchor="middle">_base.py</text>
-      <text class="bx-sub" x="360" y="98" text-anchor="middle">+ mcp_client.py</text>
+      <!-- ============ arrows (Locust right edge -> server card left edge) ============ -->
+      <!-- Learn center y = 65 -->
+      <path class="arrow" d="M210,360 C245,360 245,65 280,65" marker-end="url(#wlarr)"/>
+      <rect class="arrow-pill" x="212" y="148" width="54" height="18" rx="9"/>
+      <text class="arrow-tx" x="239" y="161" text-anchor="middle">5 VUs</text>
 
-      <rect class="box-r" x="500" y="40" width="200" height="80" rx="8"/>
-      <text class="bx-tx"  x="600" y="78" text-anchor="middle">Local Locust</text>
-      <text class="bx-sub" x="600" y="98" text-anchor="middle">·  Azure Load Testing</text>
+      <!-- GitHub center y = 240 -->
+      <path class="arrow" d="M210,360 C245,360 245,240 280,240" marker-end="url(#wlarr)"/>
+      <rect class="arrow-pill" x="212" y="291" width="54" height="18" rx="9"/>
+      <text class="arrow-tx" x="239" y="304" text-anchor="middle">2 VUs</text>
 
-      <line class="arrow" x1="220" y1="80" x2="270" y2="80" marker-end="url(#s6arr)"/>
-      <line class="arrow" x1="450" y1="80" x2="500" y2="80" marker-end="url(#s6arr)"/>
+      <!-- Context7 center y = 415 -->
+      <path class="arrow" d="M210,360 C245,360 245,415 280,415" marker-end="url(#wlarr)"/>
+      <rect class="arrow-pill" x="212" y="378" width="54" height="18" rx="9"/>
+      <text class="arrow-tx" x="239" y="391" text-anchor="middle">5 VUs</text>
+
+      <!-- ADO center y = 595 -->
+      <path class="arrow" d="M210,360 C245,360 245,595 280,595" marker-end="url(#wlarr)"/>
+      <rect class="arrow-pill" x="212" y="475" width="54" height="18" rx="9"/>
+      <text class="arrow-tx" x="239" y="488" text-anchor="middle">5 VUs</text>
+
+      <!-- ============ Card 1: Microsoft Learn (y=10, h=110) ============ -->
+      <g>
+        <rect class="card" x="280" y="10" width="600" height="110" rx="8"/>
+        <text class="srv-name" x="296" y="36">LearnUser</text>
+        <text class="srv-host" x="296" y="54">learn.microsoft.com/api/mcp  &middot;  no auth</text>
+        <rect class="vu-badge" x="740" y="20" width="124" height="22" rx="11"/>
+        <text class="vu-badge-tx" x="802" y="36" text-anchor="middle">fixed_count = 5</text>
+
+        <!-- bar 1: microsoft_docs_search @task(1) 50% -->
+        <text class="tool-name" x="296" y="84">microsoft_docs_search</text>
+        <text class="task-tag" x="500" y="84">@task(1)</text>
+        <rect class="bar-bg"   x="576" y="74" width="220" height="14"/>
+        <rect class="bar-fill" x="576" y="74" width="110" height="14"/>
+        <text class="bar-pct"  x="810" y="84">50%</text>
+        <!-- bar 2: microsoft_code_sample_search @task(1) 50% -->
+        <text class="tool-name" x="296" y="106">microsoft_code_sample_search</text>
+        <text class="task-tag" x="500" y="106">@task(1)</text>
+        <rect class="bar-bg"   x="576" y="96" width="220" height="14"/>
+        <rect class="bar-fill" x="576" y="96" width="110" height="14"/>
+        <text class="bar-pct"  x="810" y="106">50%</text>
+      </g>
+
+      <!-- ============ Card 2: GitHub (y=140, h=200) ============ -->
+      <g>
+        <rect class="card card-gh" x="280" y="140" width="600" height="200" rx="8"/>
+        <text class="srv-name" x="296" y="166">GitHubUser</text>
+        <text class="srv-host" x="296" y="184">api.githubcopilot.com/mcp/  &middot;  bearer (PAT)</text>
+        <rect class="vu-badge vu-badge-gh" x="740" y="150" width="124" height="22" rx="11"/>
+        <text class="vu-badge-tx" x="802" y="166" text-anchor="middle">fixed_count = 2</text>
+
+        <!-- 5 tools, 24px row pitch starting y=210 -->
+        <text class="tool-name" x="296" y="216">search_code</text>
+        <text class="task-tag" x="500" y="216">@task(3)</text>
+        <rect class="bar-bg" x="576" y="206" width="220" height="14"/>
+        <rect class="bar-gh" x="576" y="206" width="73"  height="14"/>
+        <text class="bar-pct" x="810" y="216">33%</text>
+
+        <text class="tool-name" x="296" y="240">search_repositories</text>
+        <text class="task-tag" x="500" y="240">@task(2)</text>
+        <rect class="bar-bg" x="576" y="230" width="220" height="14"/>
+        <rect class="bar-gh" x="576" y="230" width="48"  height="14"/>
+        <text class="bar-pct" x="810" y="240">22%</text>
+
+        <text class="tool-name" x="296" y="264">get_file_contents</text>
+        <text class="task-tag" x="500" y="264">@task(2)</text>
+        <rect class="bar-bg" x="576" y="254" width="220" height="14"/>
+        <rect class="bar-gh" x="576" y="254" width="48"  height="14"/>
+        <text class="bar-pct" x="810" y="264">22%</text>
+
+        <text class="tool-name" x="296" y="288">get_me</text>
+        <text class="task-tag" x="500" y="288">@task(1)</text>
+        <rect class="bar-bg" x="576" y="278" width="220" height="14"/>
+        <rect class="bar-gh" x="576" y="278" width="24"  height="14"/>
+        <text class="bar-pct" x="810" y="288">11%</text>
+
+        <text class="tool-name" x="296" y="312">list_issues</text>
+        <text class="task-tag" x="500" y="312">@task(1)</text>
+        <rect class="bar-bg" x="576" y="302" width="220" height="14"/>
+        <rect class="bar-gh" x="576" y="302" width="24"  height="14"/>
+        <text class="bar-pct" x="810" y="312">11%</text>
+      </g>
+
+      <!-- ============ Card 3: Context7 (y=360, h=110) ============ -->
+      <g>
+        <rect class="card card-c7" x="280" y="360" width="600" height="110" rx="8"/>
+        <text class="srv-name" x="296" y="386">Context7User</text>
+        <text class="srv-host" x="296" y="404">mcp.context7.com/mcp  &middot;  no auth</text>
+        <rect class="vu-badge vu-badge-c7" x="740" y="370" width="124" height="22" rx="11"/>
+        <text class="vu-badge-tx" x="802" y="386" text-anchor="middle">fixed_count = 5</text>
+
+        <text class="tool-name" x="296" y="434">query-docs</text>
+        <text class="task-tag" x="500" y="434">@task(3)</text>
+        <rect class="bar-bg" x="576" y="424" width="220" height="14"/>
+        <rect class="bar-c7" x="576" y="424" width="165" height="14"/>
+        <text class="bar-pct" x="810" y="434">75%</text>
+
+        <text class="tool-name" x="296" y="456">resolve-library-id</text>
+        <text class="task-tag" x="500" y="456">@task(1)</text>
+        <rect class="bar-bg" x="576" y="446" width="220" height="14"/>
+        <rect class="bar-c7" x="576" y="446" width="55"  height="14"/>
+        <text class="bar-pct" x="810" y="456">25%</text>
+      </g>
+
+      <!-- ============ Card 4: Azure DevOps Remote (y=490, h=210) ============ -->
+      <g>
+        <rect class="card card-ado" x="280" y="490" width="600" height="210" rx="8"/>
+        <text class="srv-name" x="296" y="516">ADOUser</text>
+        <text class="srv-host" x="296" y="534">mcp.dev.azure.com/{org}  &middot;  Entra bearer (per request)</text>
+        <rect class="vu-badge vu-badge-ado" x="740" y="500" width="124" height="22" rx="11"/>
+        <text class="vu-badge-tx" x="802" y="516" text-anchor="middle">fixed_count = 5</text>
+
+        <text class="tool-name" x="296" y="566">wit_work_item:get</text>
+        <text class="task-tag" x="500" y="566">@task(3)</text>
+        <rect class="bar-bg" x="576" y="556" width="220" height="14"/>
+        <rect class="bar-ado" x="576" y="556" width="66" height="14"/>
+        <text class="bar-pct" x="810" y="566">30%</text>
+
+        <text class="tool-name" x="296" y="590">wit_work_item:my</text>
+        <text class="task-tag" x="500" y="590">@task(2)</text>
+        <rect class="bar-bg" x="576" y="580" width="220" height="14"/>
+        <rect class="bar-ado" x="576" y="580" width="44" height="14"/>
+        <text class="bar-pct" x="810" y="590">20%</text>
+
+        <text class="tool-name" x="296" y="614">search_workitem</text>
+        <text class="task-tag" x="500" y="614">@task(2)</text>
+        <rect class="bar-bg" x="576" y="604" width="220" height="14"/>
+        <rect class="bar-ado" x="576" y="604" width="44" height="14"/>
+        <text class="bar-pct" x="810" y="614">20%</text>
+
+        <text class="tool-name" x="296" y="638">repo_repository</text>
+        <text class="task-tag" x="500" y="638">@task(2)</text>
+        <rect class="bar-bg" x="576" y="628" width="220" height="14"/>
+        <rect class="bar-ado" x="576" y="628" width="44" height="14"/>
+        <text class="bar-pct" x="810" y="638">20%</text>
+
+        <text class="tool-name" x="296" y="662">pipelines_build</text>
+        <text class="task-tag" x="500" y="662">@task(1)</text>
+        <rect class="bar-bg" x="576" y="652" width="220" height="14"/>
+        <rect class="bar-ado" x="576" y="652" width="22" height="14"/>
+        <text class="bar-pct" x="810" y="662">10%</text>
+      </g>
     </svg>
+    <figcaption>One Locust process &rarr; four MCP servers. Each card&rsquo;s bars are the per-tool <code>@task</code> weights inside that <code>User</code> class.</figcaption>
   </figure>
+
+  <h3 style="margin-top: 1.5em;">Trying it locally first</h3>
+
+  <p>
+    Before sending it to the cloud, the same workload runs in one
+    Python process on your laptop. <code>locust.conf</code> pins the
+    knobs (and is the same file ALT consumes via
+    <code>userPropertyFile</code>):
+  </p>
+
+  <pre><code># locust.conf
+locustfile  = multi.py
+headless    = true
+users       = 17        # 2 GitHub + 5 Learn + 5 Context7 + 5 ADO
+spawn-rate  = 5
+run-time    = 15m
+csv         = results/run
+html        = results/run.html</code></pre>
+
+  <pre><code>$ locust --config locust.conf --run-time 2m \
+    --csv results/local-2m --html results/local-2m.html</code></pre>
+
+  <p>
+    Useful for catching a broken assertion or an expired token in two
+    minutes instead of fifteen. For this post though, the run that
+    matters is the one that proves the cloud path works &mdash; so
+    let's submit it to Azure Load Testing.
+  </p>
+
+  <h3 style="margin-top: 1.5em;">Running it on Azure Load Testing</h3>
+
+  <p>
+    Same project root, same <code>multi.py</code>, same
+    <code>locust.conf</code>. Push the YAML, then start the run:
+  </p>
+
+  <pre><code>$ az login
+$ az load test update \
+    --load-test-resource &lt;your-loadtest-resource&gt; \
+    --resource-group &lt;your-rg&gt; \
+    --test-id mcp-multi-flat \
+    --load-test-config-file azure-loadtest.yaml
+
+$ az load test-run create \
+    --load-test-resource &lt;your-loadtest-resource&gt; \
+    --resource-group &lt;your-rg&gt; \
+    --test-id mcp-multi-flat \
+    --test-run-id run-$(Get-Date -Format yyyyMMdd-HHmmss) \
+    --no-wait</code></pre>
+
+  <p>
+    ALT spins up an engine, pulls the secrets from Key Vault via its
+    managed identity, fans out to the four MCP servers, and writes
+    <code>engine1_results.csv</code> back to blob storage. Fifteen
+    minutes later:
+  </p>
+
+  <pre><code># status + verdict
+$ az load test-run show --test-run-id run-2026-05-09-15m-clean-172854 ...
+{
+  "status": "DONE",
+  "testResult": "PASSED",
+  "start": "2026-05-09T11:59:20Z",
+  "end":   "2026-05-09T12:14:25Z"
+}
+
+# Headline: 2,293 requests, 3 failures (0.13%)
+Total: 2293 | Failures: 3 (0.13%)
+
+=== By label (totals + failures) ===
+Count Fail Label
+----- ---- -----
+  441    0 context7:tools/call:query-docs
+  372    0 learn:tools/call:microsoft_docs_search
+  343    0 learn:tools/call:microsoft_code_sample_search
+  328    0 ado:tools/call:wit_work_item
+  161    0 context7:tools/call:resolve-library-id
+  125    0 ado:tools/call:search_workitem
+  109    0 ado:tools/call:repo_repository
+   84    3 github:tools/call:search_code
+   75    0 github:tools/call:search_repositories
+   72    0 ado:tools/call:pipelines_build
+   64    0 github:tools/call:get_file_contents
+   31    0 github:tools/call:list_issues
+   30    0 github:tools/call:get_me</code></pre>
+
+  <p>
+    Three failures out of 2,293 &mdash; all on GitHub's
+    <code>search_code</code>, all legitimate
+    <code>tool isError=true</code> responses from its 30-call/minute
+    rate&nbsp;limit. That's the assertions doing their job: they
+    surface real upstream errors that a plain HTTP&nbsp;200 would have
+    hidden. The pass/fail criteria in the YAML
+    (<code>avg(response_time_ms) &gt; 8000</code>,
+    <code>percentage(error) &gt; 25</code>) both stay green, so ALT
+    closes the run as <code>PASSED</code> &mdash; suitable for a
+    release gate.
+  </p>
+
+  <p>
+    A quick story from the first attempt: the very first ALT run came
+    back with 415 failures (~18&nbsp;%), almost all on Context7. The
+    assertions had caught a config gap that was previously invisible
+    &mdash; the engine was hitting Context7 anonymously and getting
+    throttled. Adding <code>CONTEXT7_API_KEY</code> to the YAML's
+    <code>secrets:</code> block (already shown above) fixed it on the
+    next run. The assertions paid for themselves before the demo even
+    started.
+  </p>
+
+  <!-- ============ SECTION 7 ============ -->
+  <h2 id="results"><span class="num">7.</span>Reading the dashboard</h2>
+
+  <p>
+    <code>az&nbsp;load&nbsp;test-run download-files&nbsp;--report</code>
+    pulls the same self-contained dashboard that ALT shows in the
+    portal &mdash; a React app plus a few JSON files. Open
+    <code>index.html</code> in a browser and you get charts, tables,
+    and an error explorer wired to the run. A frozen copy of the
+    one I just took lives at
+    <a href="sample-report/index.html"><strong>sample-report/index.html</strong></a>
+    next to this post.
+  </p>
+
+  <p>
+    The interesting bits, distilled:
+  </p>
+
+  <h3>Per-server response time (tools/call only, ms)</h3>
+
+  <table>
+    <thead>
+      <tr><th>Server</th><th>Calls</th><th>p50</th><th>p95</th><th>p99</th><th>Max</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Learn</td>      <td>715</td><td>495</td><td>1018</td><td>1524</td><td>2517</td></tr>
+      <tr><td>ADO Remote</td> <td>634</td><td>889</td><td>1431</td><td>1893</td><td>2732</td></tr>
+      <tr><td>Context7</td>   <td>602</td><td>1421</td><td>1909</td><td>2298</td><td>3917</td></tr>
+      <tr><td>GitHub</td>     <td>284</td><td>619</td><td>1591</td><td>3298</td><td>4107</td></tr>
+      <tr>
+        <td><strong>Aggregate</strong></td>
+        <td><strong>2,235</strong></td>
+        <td><strong>754</strong></td>
+        <td><strong>1,707</strong></td>
+        <td><strong>2,190</strong></td>
+        <td><strong>4,107</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top: 1.25em;">Top tools by traffic and tail latency (ms)</h3>
+
+  <table>
+    <thead>
+      <tr><th>Tool</th><th>Calls</th><th>p50</th><th>p95</th><th>p99</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>context7:query-docs</code></td>             <td>441</td><td>1494</td><td>1983</td><td>2348</td></tr>
+      <tr><td><code>learn:microsoft_docs_search</code></td>     <td>372</td><td>512</td><td>952</td><td>1524</td></tr>
+      <tr><td><code>learn:microsoft_code_sample_search</code></td><td>343</td><td>475</td><td>1104</td><td>1649</td></tr>
+      <tr><td><code>ado:wit_work_item</code></td>               <td>328</td><td>478</td><td>1220</td><td>1658</td></tr>
+      <tr><td><code>context7:resolve-library-id</code></td>     <td>161</td><td>1142</td><td>1528</td><td>2286</td></tr>
+      <tr><td><code>ado:search_workitem</code></td>             <td>125</td><td>940</td><td>1436</td><td>1899</td></tr>
+      <tr><td><code>github:search_code</code></td>              <td>84</td><td>270</td><td>3077</td><td>4107</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    A few things jump out. <strong>Context7 dominates the bandwidth</strong>
+    &mdash; <code>query-docs</code> answers run ~1.5&nbsp;s at the
+    median, which is sane for a doc-retrieval call but worth knowing
+    if a coding agent chains four of them per turn. <strong>GitHub's
+    <code>search_code</code> has a bimodal distribution</strong>:
+    median 270&nbsp;ms (cache hit), p95 3&nbsp;s (rate-limited
+    backoff). <strong>Learn is fastest</strong> across the board;
+    <strong>ADO Remote is the most consistent</strong> &mdash; tight
+    spread, predictable p95 around 1.4&nbsp;s.
+  </p>
+
+  <p class="callout warn">
+    <strong>One-time warm-up cost.</strong>
+    First-contact <code>initialize</code> handshakes ranged from
+    104&nbsp;ms (Learn) to 333&nbsp;ms (ADO). They run once per VU per
+    session, so the dashboard counts them but they're not
+    steady-state &mdash; the <code>tools/call</code> rows are.
+  </p>
+
+  <p>
+    Want the full picture &mdash; charts, error breakdown, VU ramp,
+    per-minute time series? It's all in the
+    <a href="sample-report/index.html">sample dashboard</a>.
+  </p>
 
   <p>
     Full source &mdash; including <code>_base.py</code>,
     <code>multi.py</code>, and <code>azure-loadtest.yaml</code> &mdash;
-    at <a href="https://github.com/krishroy92alternate-blip/LoadTestHostedMCPServer">LoadTestHostedMCPServer</a>.
+    at <a href="https://github.com/kroy92/azure-load-test-mcp-server">azure-load-test-mcp-server</a>.
   </p>
 
 </article>
 
 <footer class="post">
-  Source code: <a href="https://github.com/krishroy92alternate-blip/LoadTestHostedMCPServer">LoadTestHostedMCPServer</a>
-  · Built with Locust 2.43, Python 3.13, uv.
+  Source code: <a href="https://github.com/kroy92/azure-load-test-mcp-server">azure-load-test-mcp-server</a>
+  &middot; Built with Locust 2.43, Python 3.13, uv.
 </footer>
 
 </body>

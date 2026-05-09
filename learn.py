@@ -5,7 +5,7 @@ import random
 
 from locust import task
 
-from _base import MCPUserBase, fixed_count_from_env, load_lines
+from _base import MCPUserBase, expect_contains, fixed_count_from_env, load_lines
 
 QUERIES = load_lines(
     "learn_queries.txt",
@@ -26,6 +26,8 @@ CODE_QUERIES = load_lines(
     ],
 )
 
+_RESULTS = expect_contains('"results":')
+
 
 class LearnUser(MCPUserBase):
     host = "https://learn.microsoft.com"
@@ -36,8 +38,8 @@ class LearnUser(MCPUserBase):
 
     @task(1)
     def docs_search(self) -> None:
-        self._call("microsoft_docs_search", {"query": random.choice(QUERIES)})
+        self._call("microsoft_docs_search", {"query": random.choice(QUERIES)}, expect=_RESULTS)
 
     @task(1)
     def code_sample_search(self) -> None:
-        self._call("microsoft_code_sample_search", {"query": random.choice(CODE_QUERIES)})
+        self._call("microsoft_code_sample_search", {"query": random.choice(CODE_QUERIES)}, expect=_RESULTS)

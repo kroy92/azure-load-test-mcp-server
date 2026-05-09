@@ -1,0 +1,2 @@
+locust>=2.31
+azure-identity>=1.17

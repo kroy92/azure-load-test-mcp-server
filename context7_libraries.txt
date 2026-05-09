@@ -1,0 +1,20 @@
+react
+next.js
+typescript
+tailwindcss
+fastapi
+django
+flask
+langchain
+pydantic
+sqlalchemy
+prisma
+mongodb
+postgres
+supabase
+shadcn ui
+tanstack query
+react router
+zustand
+vite
+playwright

@@ -1,0 +1,9 @@
+[project]
+name = "azure-load-test-mcp-server"
+version = "1.0.0"
+description = "Locust load tests for hosted MCP servers — runs locally and on Azure Load Testing from one flat folder."
+requires-python = ">=3.11"
+dependencies = [
+  "locust>=2.31",
+  "azure-identity>=1.17",
+]

@@ -1,0 +1,77 @@
+version: v0.1
+testId: mcp-multi-flat
+displayName: MCP multi-server cloud smoke (4 targets, flat layout)
+description: GitHub + Learn + Context7 + ADO MCP smoke from one flat project.
+testPlan: multi.py
+testType: Locust
+engineInstances: 1
+
+# Files uploaded alongside the test plan into the same engine working directory.
+# Listed as basenames because they all live in the project root next to multi.py.
+configurationFiles:
+  - _base.py
+  - mcp_client.py
+  - github.py
+  - learn.py
+  - context7.py
+  - ado.py
+  - requirements.txt
+  - github_code_queries.txt
+  - context7_libraries.txt
+  - context7_library_ids.txt
+  - context7_topics.txt
+  - ado_bug_ids.txt
+  - ado_queries.txt
+
+# Locust .conf consumed via --config (users / spawn-rate / run-time / stop-timeout).
+properties:
+  userPropertyFile: locust.conf
+
+# Plain env vars. Per-class VU counts MUST sum to LOCUST_USERS / locust.conf users.
+env:
+  - name: LOCUST_USERS
+    value: "17"
+  - name: LOCUST_SPAWN_RATE
+    value: "5"
+  - name: LOCUST_RUN_TIME
+    value: "240"
+  - name: GITHUB_USERS
+    value: "2"
+  - name: LEARN_USERS
+    value: "5"
+  - name: CONTEXT7_USERS
+    value: "5"
+  - name: ADO_USERS
+    value: "5"
+  - name: ADO_ORG
+    value: "krishnaroy"
+  - name: ADO_PROJECT
+    value: "learn"
+  - name: MCP_TURN_PROB
+    value: "0.2"
+  - name: MCP_INTRA_MIN
+    value: "0.1"
+  - name: MCP_INTRA_MAX
+    value: "0.5"
+  - name: MCP_TURN_MIN
+    value: "5"
+  - name: MCP_TURN_MAX
+    value: "30"
+
+# Secrets resolved from Key Vault at run time using ALT's system-assigned managed
+# identity (which has 'Key Vault Secrets User' on kv-mcpload-bd97).
+secrets:
+  - name: GITHUB_MCP_TOKEN
+    value: https://kv-mcpload-bd97.vault.azure.net/secrets/github-mcp-token
+  - name: ADO_MCP_TOKEN
+    value: https://kv-mcpload-bd97.vault.azure.net/secrets/ado-mcp-token
+
+keyvaultReferenceIdentityType: SystemAssigned
+
+failureCriteria:
+  - avg(response_time_ms) > 8000
+  - percentage(error) > 25
+
+autoStop:
+  errorPercentage: 80
+  timeWindow: 60

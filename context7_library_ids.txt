@@ -1,0 +1,16 @@
+# Context7-compatible library IDs (verified)
+/vercel/next.js
+/reactjs/react.dev
+/microsoft/typescript
+/tailwindlabs/tailwindcss
+/fastapi/fastapi
+/django/django
+/pallets/flask
+/langchain-ai/langchain
+/pydantic/pydantic
+/sqlalchemy/sqlalchemy
+/prisma/prisma
+/mongodb/docs
+/supabase/supabase
+/shadcn-ui/ui
+/tanstack/query

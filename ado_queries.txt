@@ -1,0 +1,8 @@
+# Free-text search queries consumed by ado.py via load_lines()
+# and passed as `searchText` to the search_workitem tool.
+# One query per line; blank lines and lines starting with # are ignored.
+approval workflow
+referents
+priority
+chief approver
+rejection

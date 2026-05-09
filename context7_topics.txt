@@ -1,0 +1,15 @@
+how to set up server components
+how to add authentication
+how to do streaming responses
+how to handle file uploads
+how to configure middleware
+how to set up testing
+how to deploy to production
+how to optimize performance
+how to handle errors
+how to add internationalization
+how to set up a database connection
+how to write a custom hook
+how to integrate with openai
+how to implement pagination
+how to add rate limiting

@@ -1,0 +1,10 @@
+locust language:python
+FastHttpUser language:python
+asyncio.gather language:python
+azure-identity DefaultAzureCredential
+DefaultAzureCredential get_bearer_token_provider
+@modelcontextprotocol/sdk language:typescript
+mcp.dev.azure.com
+StreamableHTTPClientTransport
+notifications/initialized language:python
+tools/list MCP language:typescript

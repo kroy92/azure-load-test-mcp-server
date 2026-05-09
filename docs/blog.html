@@ -1,0 +1,1689 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Load testing hosted MCP servers with Locust</title>
+<meta name="description" content="A portable Python harness for the Streamable HTTP transport, with four real servers as worked examples.">
+
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --fg-soft: #4a4a4a;
+    --fg-mute: #6b6b6b;
+    --bg: #fdfdfc;
+    --bg-soft: #f5f3ef;
+    --rule: #e7e3dc;
+    --accent: #2b6cb0;       /* steady blue */
+    --accent-soft: #ebf3fb;
+    --warn: #b25a00;         /* amber for callouts */
+    --warn-soft: #fff4e5;
+    --good: #2f7a3c;
+    --good-soft: #e9f5ec;
+    --code-bg: #1f2430;
+    --code-fg: #e7e6e3;
+    --code-mute: #8a8d96;
+    --max: 760px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "Inter", "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    margin: 0;
+    padding: 0 20px 80px;
+  }
+
+  /* ---------- header ---------- */
+  header.post {
+    max-width: var(--max);
+    margin: 64px auto 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--rule);
+  }
+  header.post .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 12px;
+    color: var(--fg-mute);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  header.post h1 {
+    font-size: 30px;
+    line-height: 1.2;
+    font-weight: 700;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+  }
+  header.post .subtitle {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--fg-soft);
+    font-weight: 400;
+    margin: 0 0 20px;
+  }
+  header.post .meta {
+    font-size: 14px;
+    color: var(--fg-mute);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+  }
+  header.post .meta .dot::before {
+    content: "·";
+    margin-right: 14px;
+    color: var(--rule);
+  }
+
+  /* ---------- body ---------- */
+  article {
+    max-width: var(--max);
+    margin: 0 auto;
+  }
+  article p { margin: 0 0 1.05em; }
+  article h2 {
+    font-size: 22px;
+    line-height: 1.3;
+    margin: 48px 0 14px;
+    letter-spacing: -0.005em;
+  }
+  article h2 .num {
+    color: var(--fg-mute);
+    font-weight: 500;
+    margin-right: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  article h3 {
+    font-size: 17px;
+    margin: 28px 0 10px;
+    font-weight: 600;
+  }
+  article ul, article ol { padding-left: 22px; margin: 0 0 1.05em; }
+  article li { margin-bottom: 6px; }
+  article a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: rgba(43,108,176,0.35);
+    text-underline-offset: 2px;
+  }
+  article a:hover { text-decoration-color: var(--accent); }
+
+  article code {
+    font: 0.92em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bg-soft);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  article pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin: 0 0 1.4em;
+  }
+  article pre code {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+  }
+
+  /* tables */
+  article table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 1.4em;
+    font-size: 15px;
+  }
+  article th, article td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  article th {
+    background: var(--bg-soft);
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  /* callouts */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 14px 18px;
+    border-radius: 0 6px 6px 0;
+    margin: 0 0 1.4em;
+    font-size: 15.5px;
+  }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout.good { border-color: var(--good); background: var(--good-soft); }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout strong { display: block; margin-bottom: 4px; }
+
+  /* TOC */
+  nav.toc {
+    background: var(--bg-soft);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 18px 22px;
+    font-size: 15px;
+    margin: 0 0 36px;
+  }
+  nav.toc strong {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-mute);
+    margin-bottom: 8px;
+  }
+  nav.toc ol { margin: 0; padding-left: 22px; }
+  nav.toc li { margin-bottom: 4px; }
+  nav.toc a { text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  /* footer */
+  footer.post {
+    max-width: var(--max);
+    margin: 64px auto 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-size: 14px;
+    color: var(--fg-mute);
+  }
+
+  /* placeholder section markers while drafting */
+  .draft {
+    color: var(--fg-mute);
+    font-style: italic;
+    border: 1px dashed var(--rule);
+    padding: 14px 18px;
+    border-radius: 6px;
+    background: #fafaf8;
+  }
+
+  /* figures and diagrams */
+  figure.diagram {
+    margin: 24px 0 28px;
+    text-align: center;
+  }
+  figure.diagram svg {
+    max-width: 80%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+  figure.diagram figcaption {
+    font-size: 14px;
+    color: var(--fg-mute);
+    margin-top: 8px;
+    text-align: center;
+    font-style: italic;
+    line-height: 1.5;
+  }
+  /* loop list — slightly more breathing room */
+  ol.loop-list { margin: 4px 0 1.4em; }
+  ol.loop-list li { margin-bottom: 10px; }
+
+  @media (max-width: 600px) {
+    header.post h1 { font-size: 30px; }
+    header.post .subtitle { font-size: 17px; }
+    article h2 { font-size: 22px; }
+    article pre { font-size: 13px; padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="post">
+  <h1>Load testing hosted MCP servers with Locust</h1>
+</header>
+
+<article>
+
+  <!-- ============ INTRO ============ -->
+  <p>
+    MCP servers are everywhere. Every team is exposing the tools, data,
+    and actions their product can perform so an AI agent can reach in
+    and use them. An agent is just an LLM running in a loop &mdash; it
+    looks, thinks, calls a tool, looks again, until the job is done.
+    The tools live on MCP.
+  </p>
+
+  <p>
+    MCP gives every agent and every tool the same way to talk. Instead of
+    writing a fresh, fragile integration for each new service, a team
+    builds one MCP server and any agent can use it. Each server offers
+    three simple kinds of things: <strong>tools</strong> the agent can
+    call to do something, <strong>resources</strong> it can read for
+    context, and <strong>prompts</strong> it can reuse. That small,
+    shared vocabulary is what lets one agent reach across many servers
+    &mdash; docs, code, your product &mdash; without custom glue for each one.
+  </p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 1040 560" role="img"
+         aria-label="An AI agent on the left runs a four-step loop. Its Act step calls out through an MCP layer to four hosted MCP servers stacked on the right, each listing its tools.">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/>
+        </marker>
+        <marker id="arrBlue" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#5586b3"/>
+        </marker>
+        <linearGradient id="agentFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#fff"/>
+          <stop offset="100%" stop-color="#f5f3ef"/>
+        </linearGradient>
+        <linearGradient id="mcpFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#ebf3fb"/>
+          <stop offset="100%" stop-color="#dceaf6"/>
+        </linearGradient>
+        <linearGradient id="loopBoxFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#fefdfa"/>
+          <stop offset="100%" stop-color="#efeae0"/>
+        </linearGradient>
+        <linearGradient id="customFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#fff4e5"/>
+          <stop offset="100%" stop-color="#ffe6c2"/>
+        </linearGradient>
+      </defs>
+
+      <!-- ===== AI AGENT (left) ===== -->
+      <g>
+        <rect x="20" y="170" width="370" height="240" rx="16"
+              fill="url(#agentFill)" stroke="#cfc9bd" stroke-width="1.5"/>
+        <text x="205" y="198" text-anchor="middle"
+              font-size="13" font-weight="700" fill="#1a1a1a"
+              letter-spacing="0.08em">AI AGENT (LLM IN A LOOP)</text>
+
+        <!-- 4 loop nodes inside the agent box, 2x2 -->
+        <!-- Perceive (top-left) -->
+        <g transform="translate(50 220)">
+          <rect width="140" height="64" rx="8"
+                fill="url(#loopBoxFill)" stroke="#cfc9bd"/>
+          <text x="70" y="28" text-anchor="middle" font-size="13"
+                font-weight="600" fill="#1a1a1a">1. Perceive</text>
+          <text x="70" y="48" text-anchor="middle" font-size="11"
+                fill="#4a4a4a">read the question</text>
+        </g>
+        <!-- Reason (top-right) -->
+        <g transform="translate(220 220)">
+          <rect width="140" height="64" rx="8"
+                fill="url(#loopBoxFill)" stroke="#cfc9bd"/>
+          <text x="70" y="28" text-anchor="middle" font-size="13"
+                font-weight="600" fill="#1a1a1a">2. Reason</text>
+          <text x="70" y="48" text-anchor="middle" font-size="11"
+                fill="#4a4a4a">pick which tool to call</text>
+        </g>
+        <!-- Remember (bottom-left) -->
+        <g transform="translate(50 320)">
+          <rect width="140" height="64" rx="8"
+                fill="url(#loopBoxFill)" stroke="#cfc9bd"/>
+          <text x="70" y="28" text-anchor="middle" font-size="13"
+                font-weight="600" fill="#1a1a1a">4. Remember</text>
+          <text x="70" y="48" text-anchor="middle" font-size="11"
+                fill="#4a4a4a">keep context for next turn</text>
+        </g>
+        <!-- Act (bottom-right, highlighted) -->
+        <g transform="translate(220 320)">
+          <rect width="140" height="64" rx="8"
+                fill="#dceaf6" stroke="#5586b3" stroke-width="1.5"/>
+          <text x="70" y="28" text-anchor="middle" font-size="13"
+                font-weight="700" fill="#1f3b5c">3. Act</text>
+          <text x="70" y="48" text-anchor="middle" font-size="11"
+                fill="#1f3b5c">call a tool on MCP</text>
+        </g>
+
+        <!-- loop arrows: 1→2→3→4→1 -->
+        <path d="M 190,252 L 220,252" fill="none" stroke="#6b6b6b"
+              stroke-width="1.4" marker-end="url(#arr)"/>
+        <path d="M 290,284 L 290,320" fill="none" stroke="#6b6b6b"
+              stroke-width="1.4" marker-end="url(#arr)"/>
+        <path d="M 220,352 L 190,352" fill="none" stroke="#6b6b6b"
+              stroke-width="1.4" marker-end="url(#arr)"/>
+        <path d="M 120,320 L 120,284" fill="none" stroke="#6b6b6b"
+              stroke-width="1.4" marker-end="url(#arr)"/>
+      </g>
+
+      <!-- ===== Arrow from Act → MCP layer ===== -->
+      <path d="M 360,352 L 430,352" fill="none" stroke="#5586b3"
+            stroke-width="2" marker-end="url(#arrBlue)"/>
+      <text x="395" y="344" text-anchor="middle" font-size="11"
+            fill="#5586b3" font-style="italic">tools/call</text>
+
+      <!-- ===== MCP layer (vertical bar) ===== -->
+      <g>
+        <rect x="440" y="40" width="44" height="500" rx="8"
+              fill="#1f3b5c" stroke="#1f3b5c"/>
+        <text x="462" y="290" text-anchor="middle"
+              font-size="13" font-weight="700" fill="#fff"
+              letter-spacing="0.16em"
+              transform="rotate(-90 462 290)">MCP · Streamable HTTP</text>
+      </g>
+
+      <!-- ===== fan-out arrows from MCP bar to each server (clean, one per card) ===== -->
+      <path d="M 484,80  L 540,80"  fill="none" stroke="#5586b3"
+            stroke-width="1.4" marker-end="url(#arrBlue)"/>
+      <path d="M 484,200 L 540,200" fill="none" stroke="#5586b3"
+            stroke-width="1.4" marker-end="url(#arrBlue)"/>
+      <path d="M 484,360 L 540,360" fill="none" stroke="#5586b3"
+            stroke-width="1.4" marker-end="url(#arrBlue)"/>
+      <path d="M 484,470 L 540,470" fill="none" stroke="#5586b3"
+            stroke-width="1.4" marker-end="url(#arrBlue)"/>
+
+      <!-- ===== Four MCP servers stacked on the right ===== -->
+      <!-- MS Learn -->
+      <g transform="translate(550 50)">
+        <rect width="470" height="60" rx="10"
+              fill="url(#mcpFill)" stroke="#9ec1e3" stroke-width="1.2"/>
+        <text x="16" y="24" font-size="13" font-weight="700" fill="#1f3b5c">MS Learn MCP</text>
+        <text x="16" y="46" font-size="11" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1f3b5c">microsoft_docs_search &nbsp; microsoft_code_sample_search</text>
+        <text x="454" y="24" text-anchor="end" font-size="11" font-style="italic" fill="#4a4a4a">2 tools · public, no auth</text>
+      </g>
+
+      <!-- GitHub -->
+      <g transform="translate(550 170)">
+        <rect width="470" height="80" rx="10"
+              fill="url(#mcpFill)" stroke="#9ec1e3" stroke-width="1.2"/>
+        <text x="16" y="24" font-size="13" font-weight="700" fill="#1f3b5c">GitHub MCP</text>
+        <text x="16" y="46" font-size="11" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1f3b5c">search_code &nbsp; search_repositories &nbsp; get_file_contents</text>
+        <text x="16" y="66" font-size="11" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1f3b5c">list_issues &nbsp; get_me &nbsp; …</text>
+        <text x="454" y="24" text-anchor="end" font-size="11" font-style="italic" fill="#4a4a4a">~30 tools · PAT bearer</text>
+      </g>
+
+      <!-- Context7 -->
+      <g transform="translate(550 330)">
+        <rect width="470" height="60" rx="10"
+              fill="url(#mcpFill)" stroke="#9ec1e3" stroke-width="1.2"/>
+        <text x="16" y="24" font-size="13" font-weight="700" fill="#1f3b5c">Context7 MCP</text>
+        <text x="16" y="46" font-size="11" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#1f3b5c">resolve-library-id &nbsp; query-docs</text>
+        <text x="454" y="24" text-anchor="end" font-size="11" font-style="italic" fill="#4a4a4a">2 tools · API key</text>
+      </g>
+
+      <!-- Your CUSTOM MCP (highlighted) -->
+      <g transform="translate(550 440)">
+        <rect width="470" height="60" rx="10"
+              fill="url(#customFill)" stroke="#d49b4a" stroke-width="1.5"/>
+        <text x="16" y="24" font-size="13" font-weight="700" fill="#7a4a00">Your CUSTOM MCP</text>
+        <text x="16" y="46" font-size="11" font-family="ui-monospace, Menlo, Consolas, monospace" fill="#7a4a00">read_data &nbsp; update_data</text>
+        <text x="454" y="24" text-anchor="end" font-size="11" font-style="italic" fill="#7a4a00">your tools · your auth</text>
+      </g>
+    </svg>
+  </figure>
+
+  <!-- ============ SECTION 1 ============ -->
+  <h2 id="approach"><span class="num">1.</span>Approach</h2>
+
+  <h3>Hosted means HTTP, not stdio</h3>
+  <p>
+    MCP defines two transports: <strong>stdio</strong>, where the agent
+    spawns the server as a local subprocess and pipes JSON-RPC over its
+    stdin and stdout, and <strong>Streamable HTTP</strong>, where the
+    server lives on the network. This post focuses on Streamable HTTP
+    because that's the only transport with anything to load test &mdash;
+    a stdio server has no socket, no concurrency of its own, and is
+    bounded by the single agent process that launched it.
+  </p>
+
+  <h3>The MCP life cycle</h3>
+  <p>
+    Every agent-to-server conversation follows the same formal flow: how
+    the connection opens, how messages are exchanged while it's alive,
+    and how it shuts down cleanly. That flow is the
+    <strong>MCP life cycle</strong>, and our load test has to mimic it
+    end to end &mdash; otherwise we're not testing what a real agent
+    actually puts on the wire.
+  </p>
+
+  <h3>Phase 1 &mdash; The handshake</h3>
+  <p>
+    Throughout the rest of this post the server is Microsoft Learn,
+    hosted at <code>https://learn.microsoft.com/api/mcp</code>. Every
+    arrow you see in the diagrams is a <code>POST</code> to that URL.
+  </p>
+  <p>
+    Before the agent can call a single tool, it has to introduce itself
+    and let the server introduce itself back. Three messages, in order,
+    every time:
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480" role="img" aria-label="MCP handshake sequence diagram">
+      <defs>
+        <marker id="hs-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2b6cb0"/>
+        </marker>
+        <marker id="hs-arrow-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
+        </marker>
+      </defs>
+
+      <style>
+        .actor      { fill: #1f3b5c; }
+        .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+        .lifeline   { stroke: #c8c2b6; stroke-width: 1; stroke-dasharray: 4 4; }
+        .msg        { stroke: #2b6cb0; stroke-width: 1.6; fill: none; }
+        .msg-back   { stroke: #2f7a3c; stroke-width: 1.6; fill: none; }
+        .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .body       { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #4a4a4a; }
+        .note       { font: italic 12px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+        .ok-box     { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1; }
+        .ok-text    { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #2f7a3c; }
+      </style>
+
+      <!-- Actor headers -->
+      <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
+      <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
+
+      <!-- Lifelines -->
+      <line class="lifeline" x1="120" y1="54"  x2="120" y2="430"/>
+      <line class="lifeline" x1="600" y1="54"  x2="600" y2="430"/>
+
+      <!-- 1. initialize request -->
+      <text class="label" x="130" y="84">POST /mcp</text>
+      <text class="body"  x="130" y="102">{"id":1,"method":"initialize",</text>
+      <text class="body"  x="130" y="118">&#160;"params":{"protocolVersion":"2025-03-26",</text>
+      <text class="body"  x="130" y="134">&#160;&#160;"clientInfo":{"name":"locust-client"},</text>
+      <text class="body"  x="130" y="150">&#160;&#160;"capabilities":{...}}}</text>
+      <line class="msg" x1="120" y1="162" x2="600" y2="162" marker-end="url(#hs-arrow)"/>
+
+      <!-- 2. initialize response -->
+      <text class="label" x="590" y="190" text-anchor="end">200 OK · text/event-stream</text>
+      <text class="label" x="590" y="208" text-anchor="end">Mcp-Session-Id: f41e932c…</text>
+      <text class="body"  x="590" y="226" text-anchor="end">data: {"id":1,"result":{</text>
+      <text class="body"  x="590" y="242" text-anchor="end">&#160;"serverInfo":{"name":"microsoft.docs.mcp"},</text>
+      <text class="body"  x="590" y="258" text-anchor="end">&#160;"capabilities":{...}}}</text>
+      <line class="msg-back" x1="600" y1="270" x2="120" y2="270" marker-end="url(#hs-arrow-back)"/>
+
+      <!-- 3. notifications/initialized -->
+      <text class="label" x="130" y="298">POST /mcp  +  Mcp-Session-Id: f41e932c…</text>
+      <text class="body"  x="130" y="316">{"method":"notifications/initialized"}</text>
+      <text class="note"  x="130" y="334">(fire-and-forget — server replies 202, no body)</text>
+      <line class="msg" x1="120" y1="346" x2="600" y2="346" marker-end="url(#hs-arrow)"/>
+
+      <!-- Done banner -->
+      <rect class="ok-box" x="120" y="386" width="480" height="34" rx="4"/>
+      <text class="ok-text" x="360" y="408" text-anchor="middle">✓ both sides aligned · session id minted · ready for tools/call</text>
+    </svg>
+  </figure>
+
+  <p>
+    The session id is the only thing the agent has to hold onto. Every
+    subsequent <code>tools/call</code> rides on the same
+    <code>Mcp-Session-Id</code> header until the connection ends &mdash;
+    which is exactly what a Locust virtual user has to do too.
+  </p>
+  <p>
+    One caveat: <strong>not every MCP server mints a session</strong>.
+    Stateless servers (GitHub's hosted MCP, Context7, plenty of
+    read-only wrappers) skip the <code>Mcp-Session-Id</code> header
+    entirely &mdash; the handshake still happens, but every
+    <code>tools/call</code> after it is a standalone POST. Both shapes
+    are valid; the client just has to handle either.
+  </p>
+
+  <h3>Phase 2 &mdash; Discover what the server can do</h3>
+  <p>
+    Once the handshake is done, the agent doesn't yet know what tools
+    the server actually exposes. It asks. The answer is the menu the
+    LLM gets to pick from on every turn.
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 560" role="img" aria-label="MCP tools/list sequence diagram for Microsoft Learn server">
+      <defs>
+        <marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2b6cb0"/>
+        </marker>
+        <marker id="tl-arrow-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
+        </marker>
+      </defs>
+
+      <style>
+        .actor      { fill: #1f3b5c; }
+        .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+        .lifeline   { stroke: #c8c2b6; stroke-width: 1; stroke-dasharray: 4 4; }
+        .msg        { stroke: #2b6cb0; stroke-width: 1.6; fill: none; }
+        .msg-back   { stroke: #2f7a3c; stroke-width: 1.6; fill: none; }
+        .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .body       { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #4a4a4a; }
+        .note       { font: italic 12px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+        .ok-box     { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1; }
+        .ok-text    { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #2f7a3c; }
+      </style>
+
+      <!-- Actor headers -->
+      <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
+      <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
+
+      <!-- Lifelines -->
+      <line class="lifeline" x1="120" y1="54"  x2="120" y2="520"/>
+      <line class="lifeline" x1="600" y1="54"  x2="600" y2="520"/>
+
+      <!-- 1. tools/list request -->
+      <text class="label" x="130" y="84">POST /mcp  +  Mcp-Session-Id: f41e932c…</text>
+      <text class="body"  x="130" y="102">{"id":2,"method":"tools/list"}</text>
+      <line class="msg" x1="120" y1="116" x2="600" y2="116" marker-end="url(#tl-arrow)"/>
+
+      <!-- 2. tools/list response (full payload — only two tools) -->
+      <text class="label" x="590" y="148" text-anchor="end">200 OK · text/event-stream</text>
+      <text class="body"  x="590" y="166" text-anchor="end">data: {"id":2,"result":{"tools":[</text>
+      <text class="body"  x="590" y="182" text-anchor="end">&#160;{</text>
+      <text class="body"  x="590" y="198" text-anchor="end">&#160;&#160;"name":"microsoft_docs_search",</text>
+      <text class="body"  x="590" y="214" text-anchor="end">&#160;&#160;"description":"Search official MS/Azure docs",</text>
+      <text class="body"  x="590" y="230" text-anchor="end">&#160;&#160;"inputSchema":{"type":"object",</text>
+      <text class="body"  x="590" y="246" text-anchor="end">&#160;&#160;&#160;"properties":{"query":{"type":"string"}},</text>
+      <text class="body"  x="590" y="262" text-anchor="end">&#160;&#160;&#160;"required":["query"]}</text>
+      <text class="body"  x="590" y="278" text-anchor="end">&#160;},</text>
+      <text class="body"  x="590" y="294" text-anchor="end">&#160;{</text>
+      <text class="body"  x="590" y="310" text-anchor="end">&#160;&#160;"name":"microsoft_docs_fetch",</text>
+      <text class="body"  x="590" y="326" text-anchor="end">&#160;&#160;"description":"Fetch a docs page as markdown",</text>
+      <text class="body"  x="590" y="342" text-anchor="end">&#160;&#160;"inputSchema":{"type":"object",</text>
+      <text class="body"  x="590" y="358" text-anchor="end">&#160;&#160;&#160;"properties":{"url":{"type":"string"}},</text>
+      <text class="body"  x="590" y="374" text-anchor="end">&#160;&#160;&#160;"required":["url"]}</text>
+      <text class="body"  x="590" y="390" text-anchor="end">&#160;}</text>
+      <text class="body"  x="590" y="406" text-anchor="end">]}}</text>
+      <line class="msg-back" x1="600" y1="422" x2="120" y2="422" marker-end="url(#tl-arrow-back)"/>
+
+      <!-- Done banner -->
+      <rect class="ok-box" x="120" y="472" width="480" height="34" rx="4"/>
+      <text class="ok-text" x="360" y="494" text-anchor="middle">✓ agent now knows the menu · ready to call either tool by name</text>
+    </svg>
+  </figure>
+
+  <p>
+    The response is a flat list of tool descriptors &mdash; name,
+    human-readable description, and a JSON Schema for the arguments. A
+    real agent feeds this list straight into the LLM's system prompt so
+    the model knows what it can call. A load test doesn't need the LLM
+    in the loop, but it still needs to call <code>tools/list</code>
+    at least once per session: it's how the harness learns the real tool
+    names instead of hard-coding them.
+  </p>
+
+  <h3>Phase 3 &mdash; Call a tool</h3>
+  <p>
+    This is the request the entire load test exists to measure. The
+    agent picks a tool from the menu, fills in the arguments, and POSTs
+    a <code>tools/call</code>. The reply comes back in one of two
+    shapes &mdash; the client asks for both with
+    <code>Accept: application/json, text/event-stream</code> and the
+    server picks one per request.
+  </p>
+
+  <p>The request is ordinary JSON-RPC:</p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200" role="img" aria-label="MCP tools/call request">
+      <defs>
+        <marker id="tc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2b6cb0"/>
+        </marker>
+      </defs>
+      <style>
+        .actor      { fill: #1f3b5c; }
+        .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+        .lifeline   { stroke: #c8c2b6; stroke-width: 1; stroke-dasharray: 4 4; }
+        .msg        { stroke: #2b6cb0; stroke-width: 1.6; fill: none; }
+        .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .body       { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #4a4a4a; }
+      </style>
+
+      <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
+      <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
+
+      <line class="lifeline" x1="120" y1="54" x2="120" y2="180"/>
+      <line class="lifeline" x1="600" y1="54" x2="600" y2="180"/>
+
+      <text class="label" x="130" y="84">POST /mcp  +  Mcp-Session-Id: f41e932c…</text>
+      <text class="body"  x="130" y="102">{"id":3,"method":"tools/call",</text>
+      <text class="body"  x="130" y="118">&#160;"params":{"name":"microsoft_docs_search",</text>
+      <text class="body"  x="130" y="134">&#160;&#160;"arguments":{"query":"locust load testing"}}}</text>
+      <line class="msg" x1="120" y1="148" x2="600" y2="148" marker-end="url(#tc-arrow)"/>
+    </svg>
+  </figure>
+
+  <p><strong>Mode A &mdash; <code>application/json</code>.</strong> The body <em>is</em> the JSON-RPC payload. One response, no wrapping.</p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 320" role="img" aria-label="MCP tools/call response in application/json mode">
+      <defs>
+        <marker id="tcj-arrow-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
+        </marker>
+      </defs>
+      <style>
+        .actor      { fill: #1f3b5c; }
+        .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+        .lifeline   { stroke: #c8c2b6; stroke-width: 1; stroke-dasharray: 4 4; }
+        .msg-back   { stroke: #2f7a3c; stroke-width: 1.6; fill: none; }
+        .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .body-box   { fill: #fff4e5; stroke: #d49b4a; stroke-width: 1.2; }
+        .body-text  { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .body-tag   { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #b25a00; letter-spacing: 0.06em; }
+      </style>
+
+      <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
+      <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
+
+      <line class="lifeline" x1="120" y1="54" x2="120" y2="290"/>
+      <line class="lifeline" x1="600" y1="54" x2="600" y2="290"/>
+
+      <text class="label" x="590" y="84" text-anchor="end">200 OK · Content-Type: application/json</text>
+
+      <!-- Single body block: tag sits on the box border -->
+      <rect class="body-box" x="170" y="100" width="430" height="160" rx="4"/>
+      <text class="body-tag" x="180" y="118">RESPONSE BODY — parse with .json()</text>
+      <text class="body-text" x="180" y="140">{</text>
+      <text class="body-text" x="180" y="156">&#160;"jsonrpc":"2.0","id":3,</text>
+      <text class="body-text" x="180" y="172">&#160;"result":{</text>
+      <text class="body-text" x="180" y="188">&#160;&#160;"content":[</text>
+      <text class="body-text" x="180" y="204">&#160;&#160;&#160;{"type":"text","text":"# Locust — load testing…"}</text>
+      <text class="body-text" x="180" y="220">&#160;&#160;],</text>
+      <text class="body-text" x="180" y="236">&#160;&#160;"isError":false</text>
+      <text class="body-text" x="180" y="252">&#160;}
+}</text>
+
+      <line class="msg-back" x1="600" y1="282" x2="120" y2="282" marker-end="url(#tcj-arrow-back)"/>
+    </svg>
+  </figure>
+
+  <p><strong>Mode B &mdash; <code>text/event-stream</code>.</strong> The body is a stream of frames. Each frame is two lines &mdash; <code>event: message</code> and <code>data: &lt;json&gt;</code> &mdash; and the server can send several before closing.</p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480" role="img" aria-label="MCP tools/call response in text/event-stream mode showing two frames">
+      <defs>
+        <marker id="tcs-arrow-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
+        </marker>
+      </defs>
+      <style>
+        .actor      { fill: #1f3b5c; }
+        .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+        .lifeline   { stroke: #c8c2b6; stroke-width: 1; stroke-dasharray: 4 4; }
+        .msg-back   { stroke: #2f7a3c; stroke-width: 1.6; fill: none; }
+        .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .frame-box  { fill: none; stroke: #b25a00; stroke-width: 1.2; stroke-dasharray: 5 3; }
+        .frame-tag  { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #b25a00; letter-spacing: 0.06em; }
+        .sse-line   { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #b25a00; }
+        .data-box   { fill: #fff4e5; stroke: #d49b4a; stroke-width: 1; }
+        .data-text  { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+      </style>
+
+      <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
+      <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
+
+      <line class="lifeline" x1="120" y1="54" x2="120" y2="450"/>
+      <line class="lifeline" x1="600" y1="54" x2="600" y2="450"/>
+
+      <text class="label" x="590" y="84" text-anchor="end">200 OK · Content-Type: text/event-stream</text>
+
+      <!-- ===== Frame 1 (optional progress notification) ===== -->
+      <rect class="frame-box" x="160" y="100" width="450" height="90" rx="4"/>
+      <text class="frame-tag" x="172" y="118">FRAME 1</text>
+      <text class="sse-line" x="172" y="140">event: message</text>
+      <text class="sse-line" x="172" y="158">data:</text>
+      <rect class="data-box" x="230" y="148" width="370" height="30" rx="3"/>
+      <text class="data-text" x="240" y="168">{"jsonrpc":"2.0","method":"notifications/progress",…}</text>
+
+      <!-- ===== Frame 2 (the actual result) ===== -->
+      <rect class="frame-box" x="160" y="210" width="450" height="200" rx="4"/>
+      <text class="frame-tag" x="172" y="228">FRAME 2 — the JSON-RPC result for id:3</text>
+      <text class="sse-line" x="172" y="250">event: message</text>
+      <text class="sse-line" x="172" y="268">data:</text>
+      <rect class="data-box" x="230" y="258" width="370" height="140" rx="3"/>
+      <text class="data-text" x="240" y="278">{</text>
+      <text class="data-text" x="240" y="294">&#160;"jsonrpc":"2.0","id":3,</text>
+      <text class="data-text" x="240" y="310">&#160;"result":{</text>
+      <text class="data-text" x="240" y="326">&#160;&#160;"content":[{"type":"text","text":"# Locust…"}],</text>
+      <text class="data-text" x="240" y="342">&#160;&#160;"isError":false</text>
+      <text class="data-text" x="240" y="358">&#160;}</text>
+      <text class="data-text" x="240" y="374">}</text>
+
+      <line class="msg-back" x1="600" y1="435" x2="120" y2="435" marker-end="url(#tcs-arrow-back)"/>
+    </svg>
+  </figure>
+
+  <p>
+    Same JSON-RPC result either way. The difference is the wrapper:
+    <code>application/json</code> hands you one body to parse;
+    <code>text/event-stream</code> hands you a stream you have to read,
+    split into frames, and pull the <code>data:</code> values from.
+    Calling <code>.json()</code> on an SSE response will throw. Pick one
+    mode and the harness works against some servers and breaks against
+    others. So always check <code>Content-Type</code> first, then choose
+    how to read the body.
+  </p>
+
+  <h3>Phase 4 &mdash; Clean up</h3>
+  <p>
+    When the agent is done, it tells the server. One
+    <code>DELETE</code> with the session id, and the server tears the
+    session down.
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 240" role="img" aria-label="MCP session cleanup with DELETE">
+      <defs>
+        <marker id="cl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2b6cb0"/>
+        </marker>
+        <marker id="cl-arrow-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
+        </marker>
+      </defs>
+      <style>
+        .actor      { fill: #1f3b5c; }
+        .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+        .lifeline   { stroke: #c8c2b6; stroke-width: 1; stroke-dasharray: 4 4; }
+        .msg        { stroke: #2b6cb0; stroke-width: 1.6; fill: none; }
+        .msg-back   { stroke: #2f7a3c; stroke-width: 1.6; fill: none; }
+        .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .body       { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #4a4a4a; }
+        .note       { font: italic 12px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+        .ok-box     { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1; }
+        .ok-text    { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #2f7a3c; }
+      </style>
+
+      <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
+      <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
+
+      <line class="lifeline" x1="120" y1="54" x2="120" y2="220"/>
+      <line class="lifeline" x1="600" y1="54" x2="600" y2="220"/>
+
+      <!-- DELETE request -->
+      <text class="label" x="130" y="84">DELETE /mcp  +  Mcp-Session-Id: f41e932c…</text>
+      <line class="msg" x1="120" y1="96" x2="600" y2="96" marker-end="url(#cl-arrow)"/>
+
+      <!-- Response -->
+      <text class="label" x="590" y="124" text-anchor="end">200 OK</text>
+      <text class="body"  x="590" y="142" text-anchor="end">"session terminated"</text>
+      <line class="msg-back" x1="600" y1="156" x2="120" y2="156" marker-end="url(#cl-arrow-back)"/>
+
+      <text class="note" x="130" y="184">TCP connection closed</text>
+
+      <!-- Done banner -->
+      <rect class="ok-box" x="120" y="196" width="480" height="22" rx="4"/>
+      <text class="ok-text" x="360" y="212" text-anchor="middle">✓ session id retired · server frees its state</text>
+    </svg>
+  </figure>
+
+  <p>
+    Stateless servers don't need this &mdash; there's no session to
+    delete, so the agent just stops sending requests. For stateful
+    servers, skipping the <code>DELETE</code> isn't fatal (sessions
+    eventually time out) but it leaks server memory while they wait.
+    A polite client always cleans up.
+  </p>
+
+  <h3>The other two primitives &mdash; in one breath</h3>
+  <p>
+    MCP defines two more primitives alongside tools:
+    <strong>resources</strong> (read-only data the agent can pull into
+    context) and <strong>prompts</strong> (reusable templates the user
+    can invoke). Both follow the same JSON-RPC + JSON/SSE shape you've
+    already seen.
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 220" role="img" aria-label="MCP resources/list and prompts/list requests">
+      <defs>
+        <marker id="rp-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2b6cb0"/>
+        </marker>
+        <marker id="rp-arrow-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
+        </marker>
+      </defs>
+      <style>
+        .actor      { fill: #1f3b5c; }
+        .actor-text { fill: #fff; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+        .lifeline   { stroke: #c8c2b6; stroke-width: 1; stroke-dasharray: 4 4; }
+        .msg        { stroke: #2b6cb0; stroke-width: 1.6; fill: none; }
+        .msg-back   { stroke: #2f7a3c; stroke-width: 1.6; fill: none; }
+        .label      { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .body       { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #4a4a4a; }
+      </style>
+
+      <rect class="actor" x="40"  y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="120" y="42" text-anchor="middle">Agent (client)</text>
+      <rect class="actor" x="520" y="20" width="160" height="34" rx="4"/>
+      <text class="actor-text" x="600" y="42" text-anchor="middle">Server (HTTP)</text>
+
+      <line class="lifeline" x1="120" y1="54" x2="120" y2="200"/>
+      <line class="lifeline" x1="600" y1="54" x2="600" y2="200"/>
+
+      <!-- resources -->
+      <text class="label" x="130" y="84">{"method":"resources/list"}</text>
+      <line class="msg" x1="120" y1="92" x2="600" y2="92" marker-end="url(#rp-arrow)"/>
+      <text class="body"  x="590" y="116" text-anchor="end">{"resources":[{"uri":"docs://overview","name":"Overview"}, …]}</text>
+      <line class="msg-back" x1="600" y1="124" x2="120" y2="124" marker-end="url(#rp-arrow-back)"/>
+
+      <!-- prompts -->
+      <text class="label" x="130" y="156">{"method":"prompts/list"}</text>
+      <line class="msg" x1="120" y1="164" x2="600" y2="164" marker-end="url(#rp-arrow)"/>
+      <text class="body"  x="590" y="188" text-anchor="end">{"prompts":[{"name":"summarize","arguments":[…]}, …]}</text>
+      <line class="msg-back" x1="600" y1="196" x2="120" y2="196" marker-end="url(#rp-arrow-back)"/>
+    </svg>
+  </figure>
+
+  <p>
+    <strong>This post focuses on tools only.</strong> Tools are where
+    the real work happens &mdash; they're the only primitive that runs
+    server-side code, hits databases, calls downstream APIs, and
+    actually <em>does</em> something. Resources are static reads;
+    prompts are templates. If your MCP server is going to fall over
+    under load, it will fall over on a <code>tools/call</code>.
+  </p>
+
+  <!-- ============ SECTION 2 ============ -->
+  <h2 id="scripting"><span class="num">2.</span>Writing the first Locust script</h2>
+
+  <p>
+    Before we factor anything out, let's write the whole MCP life cycle
+    by hand against one server. The target is the public Microsoft
+    Learn MCP at <code>https://learn.microsoft.com/api/mcp</code> &mdash;
+    no auth, stateful (it issues a session id on
+    <code>initialize</code>), spec-compliant Streamable HTTP. Five
+    blocks, each one of the four wire phases plus the data we feed it.
+    Everything below could live in a single file with one import:
+    Locust.
+  </p>
+
+  <h3>Step 1. Define the data and target</h3>
+  <p>
+    A list of queries to rotate through, and the standard Locust
+    <code>FastHttpUser</code> pointed at the host. <code>mcp_path</code>
+    and <code>protocol_version</code> are constants we'll reuse in
+    every request below.
+  </p>
+  <pre><code>import json, random, time, itertools
+from locust import FastHttpUser, constant, task
+
+QUERIES = [
+    "azure functions cold start",
+    "entra id conditional access",
+    "aks cluster autoscaler",
+    "cosmos db throughput rules",
+]
+
+_id_counter = itertools.count(1)
+
+
+class LearnUser(FastHttpUser):
+    host             = "https://learn.microsoft.com"
+    mcp_path         = "/api/mcp"
+    protocol_version = "2025-06-18"
+    session_id: str | None = None
+
+    # pace each VU at one task per second
+    wait_time = constant(1)</code></pre>
+
+  <h3>Step 2. Initialize the session</h3>
+  <p>
+    Locust calls <code>on_start</code> once per virtual user. We POST
+    a JSON-RPC <code>initialize</code> with our protocol version and a
+    client name, then read the <code>Mcp-Session-Id</code> header off
+    the response &mdash; every subsequent request has to send it back.
+    The server replies as Server-Sent Events, so the body is
+    <code>data: {...}</code> framed; we pluck the JSON off the
+    <code>data:</code> line.
+  </p>
+  <pre><code>    def on_start(self):
+        rpc_id = next(_id_counter)
+        payload = {
+            "jsonrpc": "2.0", "id": rpc_id, "method": "initialize",
+            "params": {
+                "protocolVersion": self.protocol_version,
+                "capabilities": {},
+                "clientInfo": {"name": "learn-first", "version": "1.0.0"},
+            },
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Accept":       "application/json, text/event-stream",
+        }
+        with self.client.post(self.mcp_path, data=json.dumps(payload),
+                              headers=headers, name="learn:initialize",
+                              catch_response=True) as r:
+            r.raise_for_status()
+            self.session_id = r.headers.get("Mcp-Session-Id")
+            if not self.session_id:
+                r.failure("no Mcp-Session-Id"); return
+            r.success()
+
+        self._notify_initialized()
+        self._tools_list()</code></pre>
+
+  <h3>Step 3. Confirm the handshake and list available tools</h3>
+  <p>
+    Two more POSTs to finish opening the session. The notification
+    tells the server we're ready (it returns 202 with no body).
+    <code>tools/list</code> is what we'd parse to discover tool names
+    dynamically &mdash; for this script we already know them, so we just
+    call it to honour the life cycle and record the latency.
+  </p>
+  <pre><code>    def _headers(self):
+        return {
+            "Content-Type":         "application/json",
+            "Accept":               "application/json, text/event-stream",
+            "MCP-Protocol-Version": self.protocol_version,
+            "Mcp-Session-Id":       self.session_id,
+        }
+
+    def _notify_initialized(self):
+        payload = {"jsonrpc": "2.0", "method": "notifications/initialized"}
+        with self.client.post(self.mcp_path, data=json.dumps(payload),
+                              headers=self._headers(),
+                              name="learn:notifications/initialized",
+                              catch_response=True) as r:
+            r.success() if r.status_code == 202 else r.failure(f"got {r.status_code}")
+
+    def _tools_list(self):
+        rpc_id = next(_id_counter)
+        payload = {"jsonrpc": "2.0", "id": rpc_id, "method": "tools/list"}
+        with self.client.post(self.mcp_path, data=json.dumps(payload),
+                              headers=self._headers(),
+                              name="learn:tools/list",
+                              catch_response=True) as r:
+            r.raise_for_status(); r.success()</code></pre>
+
+  <h3>Step 4. Call a tool under load</h3>
+  <p>
+    This is what repeats. Each <code>@task</code> is one tool call;
+    the integer is the weight, so Locust picks each method 50% of the
+    time. The wire shape is identical to <code>tools/list</code>, just
+    with method <code>tools/call</code> and a <code>params</code>
+    block carrying the tool name and arguments. The response comes back
+    SSE-framed; we walk the <code>data:</code> lines to find the frame
+    whose <code>id</code> matches our request.
+  </p>
+  <pre><code>    def _call(self, tool: str, arguments: dict):
+        rpc_id = next(_id_counter)
+        payload = {
+            "jsonrpc": "2.0", "id": rpc_id, "method": "tools/call",
+            "params": {"name": tool, "arguments": arguments},
+        }
+        with self.client.post(self.mcp_path, data=json.dumps(payload),
+                              headers=self._headers(),
+                              name=f"learn:tools/call:{tool}",
+                              catch_response=True) as r:
+            r.raise_for_status()
+            obj = self._parse_sse(r.content, rpc_id)
+            if "error" in obj:
+                r.failure(f"jsonrpc error: {obj['error']}"); return
+            r.success()
+
+    @staticmethod
+    def _parse_sse(body: bytes, want_id: int) -&gt; dict:
+        for ev in body.decode("utf-8", "replace").split("\n\n"):
+            data = "\n".join(ln[5:].lstrip() for ln in ev.splitlines()
+                             if ln.startswith("data:"))
+            if not data: continue
+            obj = json.loads(data)
+            if obj.get("id") == want_id: return obj
+        return {}
+
+    @task(1)
+    def docs_search(self):
+        self._call("microsoft_docs_search", {"query": random.choice(QUERIES)})
+
+    @task(1)
+    def code_sample_search(self):
+        self._call("microsoft_code_sample_search", {"query": random.choice(QUERIES)})</code></pre>
+
+  <h3>Step 5. Close the session cleanly</h3>
+  <p>
+    Locust calls <code>on_stop</code> when a VU is shutting down. The
+    spec asks the client to terminate the session explicitly &mdash;
+    one DELETE to the same path with the session id, that's it.
+  </p>
+  <pre><code>    def on_stop(self):
+        if not self.session_id: return
+        with self.client.delete(self.mcp_path, headers=self._headers(),
+                                name="learn:DELETE",
+                                catch_response=True) as r:
+            r.success() if r.status_code in (200, 202, 204, 404, 405) \
+                else r.failure(f"got {r.status_code}")
+        self.session_id = None</code></pre>
+
+  <p>
+    That's a complete, runnable script for one MCP server &mdash;
+    initialize, notify, list, call, delete. Save it as
+    <code>learn_first.py</code>. The only dependency is Locust itself:
+  </p>
+  <pre><code># with uv
+uv pip install "locust>=2.31"
+
+# or with pip in an active venv
+python -m pip install "locust>=2.31"</code></pre>
+  <p>
+    Then run it &mdash; this will produce the same six-row Locust table
+    you'll see in &sect;4:
+  </p>
+  <pre><code># with uv
+uv run locust -f learn_first.py --headless -u 5 -r 1 -t 30s
+
+# or, inside an active venv
+python -m locust -f learn_first.py --headless -u 5 -r 1 -t 30s</code></pre>
+
+  <p>
+    After 30&nbsp;seconds, Locust prints the summary table. One row
+    per request name, with counts and latency in milliseconds:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left">Endpoint</th>
+        <th style="text-align:right"># reqs</th>
+        <th style="text-align:right">fails</th>
+        <th style="text-align:right">p50</th>
+        <th style="text-align:right">p95</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>learn:initialize</code></td>                              <td style="text-align:right">5</td>   <td style="text-align:right">0</td> <td style="text-align:right">820</td>  <td style="text-align:right">850</td></tr>
+      <tr><td><code>learn:notifications/initialized</code></td>               <td style="text-align:right">5</td>   <td style="text-align:right">0</td> <td style="text-align:right">620</td>  <td style="text-align:right">660</td></tr>
+      <tr><td><code>learn:tools/list</code></td>                              <td style="text-align:right">5</td>   <td style="text-align:right">0</td> <td style="text-align:right">320</td>  <td style="text-align:right">330</td></tr>
+      <tr><td><code>learn:tools/call:microsoft_docs_search</code></td>        <td style="text-align:right">36</td>  <td style="text-align:right">0</td> <td style="text-align:right">880</td>  <td style="text-align:right">1500</td></tr>
+      <tr><td><code>learn:tools/call:microsoft_code_sample_search</code></td> <td style="text-align:right">29</td>  <td style="text-align:right">0</td> <td style="text-align:right">860</td>  <td style="text-align:right">1500</td></tr>
+      <tr><td><code>learn:DELETE</code></td>                                  <td style="text-align:right">5</td>   <td style="text-align:right">0</td> <td style="text-align:right">380</td>  <td style="text-align:right">510</td></tr>
+      <tr><td><strong>Aggregated</strong></td>                                <td style="text-align:right"><strong>85</strong></td> <td style="text-align:right"><strong>0</strong></td> <td style="text-align:right"><strong>820</strong></td>  <td style="text-align:right"><strong>1400</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Five virtual users for thirty seconds drove 85 requests at
+    ~2.9&nbsp;RPS with zero failures. Each VU sleeps one second
+    between tasks (<code>wait_time = constant(1)</code>), so the rate
+    is paced rather than going as fast as the network allows. The
+    five lifecycle endpoints (<code>initialize</code>,
+    <code>notifications/initialized</code>, <code>tools/list</code>,
+    <code>DELETE</code>) each ran exactly once per VU; the rest is
+    <code>tools/call</code>, split roughly 50/50 between the two
+    <code>@task</code> methods. We'll come back to these numbers in
+    &sect;5 when we talk about what they mean.
+  </p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 720 200" role="img"
+         aria-label="Four MCP wire phases shown as horizontal pill boxes. tools/call is highlighted as the one that repeats per request.">
+      <style>
+        .pill      { fill: #ebf3fb; stroke: #5586b3; stroke-width: 1.2; }
+        .pill-call { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1.6; }
+        .pill-text { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .arrow     { stroke: #6b6b6b; stroke-width: 1.2; fill: none; }
+        .arrow-you { stroke: #2f7a3c; stroke-width: 1.6; fill: none; }
+        .you-text  { font: 600 12px -apple-system, "Segoe UI", sans-serif; fill: #2f7a3c; }
+        .auto-text { font: italic 12px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+      </style>
+      <defs>
+        <marker id="s2arr" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/>
+        </marker>
+        <marker id="s2arrG" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2f7a3c"/>
+        </marker>
+      </defs>
+
+      <rect class="pill"      x="20"  y="90" width="140" height="44" rx="22"/>
+      <text class="pill-text" x="90"  y="117" text-anchor="middle">initialize</text>
+      <rect class="pill"      x="190" y="90" width="140" height="44" rx="22"/>
+      <text class="pill-text" x="260" y="117" text-anchor="middle">tools/list</text>
+      <rect class="pill-call" x="360" y="90" width="140" height="44" rx="22"/>
+      <text class="pill-text" x="430" y="117" text-anchor="middle">tools/call</text>
+      <rect class="pill"      x="530" y="90" width="140" height="44" rx="22"/>
+      <text class="pill-text" x="600" y="117" text-anchor="middle">DELETE</text>
+
+      <line class="arrow"     x1="160" y1="112" x2="190" y2="112" marker-end="url(#s2arr)"/>
+      <line class="arrow"     x1="330" y1="112" x2="360" y2="112" marker-end="url(#s2arr)"/>
+      <line class="arrow"     x1="500" y1="112" x2="530" y2="112" marker-end="url(#s2arr)"/>
+
+      <text class="you-text"  x="430" y="50" text-anchor="middle">repeats per request</text>
+      <line class="arrow-you" x1="430" y1="58"  x2="430" y2="86" marker-end="url(#s2arrG)"/>
+
+      <text class="auto-text" x="90"  y="170" text-anchor="middle">once · on_start</text>
+      <text class="auto-text" x="260" y="170" text-anchor="middle">once · on_start</text>
+      <text class="auto-text" x="600" y="170" text-anchor="middle">once · on_stop</text>
+    </svg>
+    <figcaption>The four wire phases of one MCP session. We wrote all four in <code>learn_first.py</code>; only <code>tools/call</code> repeats under load.</figcaption>
+  </figure>
+
+  <!-- ============ SECTION 3 ============ -->
+  <h2 id="workload"><span class="num">3.</span>Designing the workload</h2>
+
+  <p>
+    Each server has its own per-tool weighting via <code>@task(N)</code>,
+    plus a shared agent-shaped think-time model: 80% short
+    intra-turn pauses (0.1&ndash;0.5&nbsp;s) and 20% longer inter-turn
+    idles (5&ndash;30&nbsp;s). Together they shape what each virtual
+    user actually puts on the wire.
+  </p>
+
+  <h3>Microsoft Learn &mdash; 2 tools, equal weight</h3>
+  <figure class="diagram">
+    <svg viewBox="0 0 720 200" role="img"
+         aria-label="Microsoft Learn tool weights: microsoft_docs_search 50%, microsoft_code_sample_search 50%.">
+      <style>
+        .bar-bg    { fill: #f5f3ef; stroke: #e7e3dc; }
+        .bar-fill  { fill: #2b6cb0; }
+        .bar-label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .bar-pct   { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
+        .title     { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+      </style>
+      <text class="title" x="20" y="30">tool                                    weight</text>
+
+      <text class="bar-label" x="20"  y="80">microsoft_docs_search</text>
+      <rect class="bar-bg"   x="280" y="62" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="62" width="190" height="22"/>
+      <text class="bar-pct"  x="670" y="80" text-anchor="end">50%</text>
+
+      <text class="bar-label" x="20"  y="140">microsoft_code_sample_search</text>
+      <rect class="bar-bg"   x="280" y="122" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="122" width="190" height="22"/>
+      <text class="bar-pct"  x="670" y="140" text-anchor="end">50%</text>
+    </svg>
+  </figure>
+
+  <h3>GitHub &mdash; 5 tools, search-heavy</h3>
+  <figure class="diagram">
+    <svg viewBox="0 0 720 320" role="img"
+         aria-label="GitHub MCP tool weights: search_code 33%, search_repositories 22%, get_file_contents 22%, get_me 11%, list_issues 11%.">
+      <style>
+        .bar-bg    { fill: #f5f3ef; stroke: #e7e3dc; }
+        .bar-fill  { fill: #2b6cb0; }
+        .bar-label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .bar-pct   { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
+        .title     { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+      </style>
+      <text class="title" x="20" y="30">tool                                    weight</text>
+
+      <text class="bar-label" x="20"  y="68">search_code</text>
+      <rect class="bar-bg"   x="280" y="50" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="50" width="125" height="22"/>
+      <text class="bar-pct"  x="670" y="68" text-anchor="end">33%</text>
+
+      <text class="bar-label" x="20"  y="118">search_repositories</text>
+      <rect class="bar-bg"   x="280" y="100" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="100" width="84" height="22"/>
+      <text class="bar-pct"  x="670" y="118" text-anchor="end">22%</text>
+
+      <text class="bar-label" x="20"  y="168">get_file_contents</text>
+      <rect class="bar-bg"   x="280" y="150" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="150" width="84" height="22"/>
+      <text class="bar-pct"  x="670" y="168" text-anchor="end">22%</text>
+
+      <text class="bar-label" x="20"  y="218">get_me</text>
+      <rect class="bar-bg"   x="280" y="200" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="200" width="42" height="22"/>
+      <text class="bar-pct"  x="670" y="218" text-anchor="end">11%</text>
+
+      <text class="bar-label" x="20"  y="268">list_issues</text>
+      <rect class="bar-bg"   x="280" y="250" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="250" width="42" height="22"/>
+      <text class="bar-pct"  x="670" y="268" text-anchor="end">11%</text>
+    </svg>
+  </figure>
+
+  <h3>Context7 &mdash; 2 tools, 75/25</h3>
+  <figure class="diagram">
+    <svg viewBox="0 0 720 200" role="img"
+         aria-label="Context7 tool weights: query-docs 75%, resolve-library-id 25%.">
+      <style>
+        .bar-bg    { fill: #f5f3ef; stroke: #e7e3dc; }
+        .bar-fill  { fill: #2b6cb0; }
+        .bar-label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .bar-pct   { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
+        .title     { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+      </style>
+      <text class="title" x="20" y="30">tool                                    weight</text>
+
+      <text class="bar-label" x="20"  y="80">query-docs</text>
+      <rect class="bar-bg"   x="280" y="62" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="62" width="285" height="22"/>
+      <text class="bar-pct"  x="670" y="80" text-anchor="end">75%</text>
+
+      <text class="bar-label" x="20"  y="140">resolve-library-id</text>
+      <rect class="bar-bg"   x="280" y="122" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="122" width="95" height="22"/>
+      <text class="bar-pct"  x="670" y="140" text-anchor="end">25%</text>
+    </svg>
+  </figure>
+
+  <h3>Azure DevOps Remote &mdash; 5 tools, work-item heavy</h3>
+  <figure class="diagram">
+    <svg viewBox="0 0 720 320" role="img"
+         aria-label="Azure DevOps Remote MCP tool weights: wit_work_item:get 30%, wit_work_item:my 20%, search_workitem 20%, repo_repository 20%, pipelines_build 10%.">
+      <style>
+        .bar-bg    { fill: #f5f3ef; stroke: #e7e3dc; }
+        .bar-fill  { fill: #2b6cb0; }
+        .bar-label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .bar-pct   { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
+        .title     { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+      </style>
+      <text class="title" x="20" y="30">tool                                    weight</text>
+
+      <text class="bar-label" x="20"  y="68">wit_work_item:get</text>
+      <rect class="bar-bg"   x="280" y="50" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="50" width="114" height="22"/>
+      <text class="bar-pct"  x="670" y="68" text-anchor="end">30%</text>
+
+      <text class="bar-label" x="20"  y="118">wit_work_item:my</text>
+      <rect class="bar-bg"   x="280" y="100" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="100" width="76" height="22"/>
+      <text class="bar-pct"  x="670" y="118" text-anchor="end">20%</text>
+
+      <text class="bar-label" x="20"  y="168">search_workitem</text>
+      <rect class="bar-bg"   x="280" y="150" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="150" width="76" height="22"/>
+      <text class="bar-pct"  x="670" y="168" text-anchor="end">20%</text>
+
+      <text class="bar-label" x="20"  y="218">repo_repository</text>
+      <rect class="bar-bg"   x="280" y="200" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="200" width="76" height="22"/>
+      <text class="bar-pct"  x="670" y="218" text-anchor="end">20%</text>
+
+      <text class="bar-label" x="20"  y="268">pipelines_build</text>
+      <rect class="bar-bg"   x="280" y="250" width="380" height="22"/>
+      <rect class="bar-fill" x="280" y="250" width="38" height="22"/>
+      <text class="bar-pct"  x="670" y="268" text-anchor="end">10%</text>
+    </svg>
+  </figure>
+
+  <p>
+    Each class also declares <code>fixed_count</code>, the number of
+    virtual users Locust spawns for it. The defaults add up to 17, which
+    matches <code>users = 17</code> in <code>locust.conf</code>:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Class</th><th>Env var</th><th>Default VUs</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>LearnUser</td><td><code>LEARN_USERS</code></td><td>5</td></tr>
+      <tr><td>GitHubUser</td><td><code>GITHUB_USERS</code></td><td>2</td></tr>
+      <tr><td>Context7User</td><td><code>CONTEXT7_USERS</code></td><td>5</td></tr>
+      <tr><td>ADOUser</td><td><code>ADO_USERS</code></td><td>5</td></tr>
+      <tr><td><strong>Total</strong></td><td></td><td><strong>17</strong></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ SECTION 4 ============ -->
+  <h2 id="run"><span class="num">4.</span>Running the test</h2>
+
+  <p>
+    One server at a time first &mdash; that's the smoke. Switch
+    <code>-f learn.py</code> for <code>-f multi.py</code> to fan out the
+    full 17-VU mix across all four servers in one process.
+  </p>
+
+  <pre><code>$ uv run locust -f learn.py --headless -u 5 -r 1 -t 60s
+
+[2026-05-09 09:14:01] Starting Locust 2.43.0
+[2026-05-09 09:14:01] Spawning 5 users at 1.00 users/s
+
+ Type   Name                                          # reqs   # fails  Avg     Min     Max     Med  | req/s  failures/s
+--------------------------------------------------------------------------------------------------------------------
+ POST   learn:initialize                                   5         0  1404     755    1884   1600  |  0.10        0.00
+ POST   learn:notifications/initialized                    5         0   629     271     743    710  |  0.10        0.00
+ POST   learn:tools/list                                   5         0   424     387     514    390  |  0.10        0.00
+ POST   learn:tools/call:microsoft_docs_search           28         0   800     551    1346    690  |  0.61        0.00
+ POST   learn:tools/call:microsoft_code_sample_search    21         0   779     520    1351    730  |  0.46        0.00
+ DELETE learn:DELETE                                       4         0   285     260     326    270  |  0.09        0.00
+--------------------------------------------------------------------------------------------------------------------
+        Aggregated                                       68         0   713     260    1884    700  |  1.46        0.00</code></pre>
+
+  <p>
+    Six rows tell the whole story: the handshake, the tools/list
+    discovery, the two tool calls under load, and the polite DELETE on
+    shutdown. Same shape repeats for every server &mdash;
+    <code>multi.py</code> just runs four of them at once.
+  </p>
+
+  <!-- ============ SECTION 5 ============ -->
+  <h2 id="results"><span class="num">5.</span>Results</h2>
+
+  <p>
+    A four-minute smoke at 17 VUs &mdash; 5 Learn, 2 GitHub, 5 Context7,
+    5 ADO &mdash; against the live, public endpoints. Every number
+    below comes straight from <code>results/smoke_stats.csv</code>; the
+    table aggregates each server's <code>tools/call</code> rows.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Server</th>
+        <th>Calls</th>
+        <th>p50</th>
+        <th>p95</th>
+        <th>Max</th>
+        <th>Errors</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Learn</td>        <td>49</td><td>700&nbsp;ms</td><td>1.2&nbsp;s</td><td>1.4&nbsp;s</td><td>0</td></tr>
+      <tr><td>Context7</td>     <td>40</td><td>320&nbsp;ms</td><td>445&nbsp;ms</td><td>465&nbsp;ms</td><td>0</td></tr>
+      <tr><td>GitHub</td>       <td>14</td><td>1.4&nbsp;s</td><td>5.6&nbsp;s</td><td>5.6&nbsp;s</td><td>0</td></tr>
+      <tr><td>ADO Remote</td>   <td>46</td><td>510&nbsp;ms</td><td>2.0&nbsp;s</td><td>2.8&nbsp;s</td><td>0</td></tr>
+      <tr>
+        <td><strong>Aggregate (all requests)</strong></td>
+        <td><strong>206</strong></td>
+        <td><strong>580&nbsp;ms</strong></td>
+        <td><strong>2.6&nbsp;s</strong></td>
+        <td><strong>5.6&nbsp;s</strong></td>
+        <td><strong>0&nbsp;/&nbsp;4.5&nbsp;RPS</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 720 320" role="img"
+         aria-label="Grouped bar chart comparing p50 and p95 response times in milliseconds across Learn, Context7, GitHub, and ADO Remote.">
+      <style>
+        .axis      { stroke: #6b6b6b; stroke-width: 1; }
+        .grid      { stroke: #e7e3dc; stroke-width: 1; }
+        .tick      { font: 11px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+        .cat       { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #1a1a1a; }
+        .p50       { fill: #2b6cb0; }
+        .p95       { fill: #b25a00; }
+        .legend-tx { font: 13px -apple-system, "Segoe UI", sans-serif; fill: #1a1a1a; }
+        .barval    { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #1a1a1a; }
+      </style>
+
+      <!-- legend -->
+      <rect class="p50" x="450" y="20" width="14" height="14"/>
+      <text class="legend-tx" x="470" y="32">p50</text>
+      <rect class="p95" x="540" y="20" width="14" height="14"/>
+      <text class="legend-tx" x="560" y="32">p95</text>
+
+      <!-- Y axis: 0..6000 ms -->
+      <line class="axis" x1="60" y1="60" x2="60" y2="270"/>
+      <line class="grid" x1="60" y1="60"  x2="700" y2="60"/>
+      <line class="grid" x1="60" y1="130" x2="700" y2="130"/>
+      <line class="grid" x1="60" y1="200" x2="700" y2="200"/>
+      <line class="axis" x1="60" y1="270" x2="700" y2="270"/>
+      <text class="tick" x="55" y="64"  text-anchor="end">6000 ms</text>
+      <text class="tick" x="55" y="134" text-anchor="end">4000 ms</text>
+      <text class="tick" x="55" y="204" text-anchor="end">2000 ms</text>
+      <text class="tick" x="55" y="274" text-anchor="end">0</text>
+
+      <!-- bar groups: each group 140 wide, two bars 28 wide, 8 gap. Scale: 210 px = 6000 ms -->
+      <!-- Learn: p50 700, p95 1200 -->
+      <g transform="translate(110 0)">
+        <rect class="p50" x="0"  y="245.5" width="28" height="24.5"/>
+        <rect class="p95" x="36" y="228"   width="28" height="42"/>
+        <text class="barval" x="14" y="240" text-anchor="middle">700</text>
+        <text class="barval" x="50" y="222" text-anchor="middle">1200</text>
+        <text class="cat"    x="32" y="290" text-anchor="middle">Learn</text>
+      </g>
+
+      <!-- Context7: p50 320, p95 445 -->
+      <g transform="translate(260 0)">
+        <rect class="p50" x="0"  y="258.8" width="28" height="11.2"/>
+        <rect class="p95" x="36" y="254.4" width="28" height="15.6"/>
+        <text class="barval" x="14" y="253" text-anchor="middle">320</text>
+        <text class="barval" x="50" y="248" text-anchor="middle">445</text>
+        <text class="cat"    x="32" y="290" text-anchor="middle">Context7</text>
+      </g>
+
+      <!-- GitHub: p50 1400, p95 5600 -->
+      <g transform="translate(410 0)">
+        <rect class="p50" x="0"  y="221"  width="28" height="49"/>
+        <rect class="p95" x="36" y="74"   width="28" height="196"/>
+        <text class="barval" x="14" y="215" text-anchor="middle">1400</text>
+        <text class="barval" x="50" y="68"  text-anchor="middle">5600</text>
+        <text class="cat"    x="32" y="290" text-anchor="middle">GitHub</text>
+      </g>
+
+      <!-- ADO Remote: p50 510, p95 2000 -->
+      <g transform="translate(560 0)">
+        <rect class="p50" x="0"  y="252.2" width="28" height="17.8"/>
+        <rect class="p95" x="36" y="200"   width="28" height="70"/>
+        <text class="barval" x="14" y="246" text-anchor="middle">510</text>
+        <text class="barval" x="50" y="194" text-anchor="middle">2000</text>
+        <text class="cat"    x="32" y="290" text-anchor="middle">ADO Remote</text>
+      </g>
+    </svg>
+    <figcaption>p50 vs p95 by server. Learn and ADO sit in the same band; GitHub's p95 is dragged up by <code>search_code</code>.</figcaption>
+  </figure>
+
+  <p class="callout warn">
+    <strong>One-time warm-up cost.</strong>
+    First-contact <code>initialize</code> handshakes ranged from
+    1.4&nbsp;s (Learn) to 3.0&nbsp;s (Context7) and 2.7&nbsp;s
+    (GitHub). They run once per VU per session, so they show up in the
+    table above but they're not steady-state &mdash; the
+    <code>tools/call</code> rows are.
+  </p>
+
+  <!-- ============ SECTION 6 ============ -->
+  <h2 id="framework"><span class="num">6.</span>From script to reusable framework</h2>
+
+  <p>
+    Every server we tested does that same five-block dance. Initialize,
+    notify, list, call, delete &mdash; only the host, the tool names,
+    and (for some) the auth header change. So we lifted the wire
+    plumbing into <code>_base.py</code> and let each per-server file
+    keep just the bits that actually differ.
+  </p>
+
+  <p>
+    <code>MCPUserBase</code> owns the life cycle from §2:
+    <code>on_start</code> runs <code>_initialize</code>,
+    <code>_notify_initialized</code>, <code>_tools_list</code>;
+    <code>on_stop</code> runs <code>_terminate_session</code>;
+    <code>_call</code> wraps <code>_jsonrpc</code> for every
+    <code>tools/call</code>; <code>wait_time</code> implements the
+    80/20 agent-shaped think time; <code>_extra_headers</code> is the
+    hook subclasses override to mint auth tokens. Stateful servers
+    (Learn, GitHub) inherit it directly. Stateless servers (Context7,
+    ADO Remote) go through <code>StatelessMCPUser</code>, which just
+    flips <code>requires_session = False</code> so the DELETE step is a
+    no-op. Each leaf class is then a handful of <code>@task</code>
+    methods.
+  </p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 760 480" role="img"
+         aria-label="Class hierarchy: MCPUserBase has two stateful children (LearnUser, GitHubUser) and one intermediate child (StatelessMCPUser), which in turn has two children (Context7User, ADOUser).">
+      <style>
+        .cls-base    { fill: #ebf3fb; stroke: #2b6cb0; stroke-width: 1.6; }
+        .cls-mid     { fill: #fff4e5; stroke: #b25a00; stroke-width: 1.6; }
+        .cls-leaf    { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1.4; }
+        .cls-name    { font: 700 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .cls-tag     { font: italic 11px -apple-system, "Segoe UI", sans-serif; fill: #6b6b6b; }
+        .mth         { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .sep         { stroke: #cfd6df; stroke-width: 1; }
+        .inh         { stroke: #6b6b6b; stroke-width: 1.4; fill: none; }
+      </style>
+      <defs>
+        <marker id="s6inh" viewBox="0 0 12 12" refX="6" refY="6"
+                markerWidth="11" markerHeight="11" orient="auto">
+          <path d="M0,0 L12,6 L0,12 z" fill="#fff" stroke="#6b6b6b" stroke-width="1.2"/>
+        </marker>
+      </defs>
+
+      <!-- ===== MCPUserBase (top) ===== -->
+      <g>
+        <rect class="cls-base" x="240" y="20" width="280" height="186" rx="6"/>
+        <text class="cls-name" x="380" y="42" text-anchor="middle">MCPUserBase</text>
+        <text class="cls-tag"  x="380" y="58" text-anchor="middle">abstract · FastHttpUser</text>
+        <line class="sep" x1="248" y1="68" x2="512" y2="68"/>
+        <text class="mth" x="256" y="88">on_start()</text>
+        <text class="mth" x="256" y="104">on_stop()</text>
+        <text class="mth" x="256" y="120">wait_time()</text>
+        <text class="mth" x="256" y="136">_initialize()</text>
+        <text class="mth" x="256" y="152">_notify_initialized()</text>
+        <text class="mth" x="256" y="168">_tools_list()</text>
+        <text class="mth" x="256" y="184">_terminate_session()</text>
+        <text class="mth" x="256" y="200">_call() · _jsonrpc()</text>
+      </g>
+
+      <!-- ===== LearnUser (left leaf, direct child) ===== -->
+      <g>
+        <rect class="cls-leaf" x="20" y="280" width="200" height="120" rx="6"/>
+        <text class="cls-name" x="120" y="302" text-anchor="middle">LearnUser</text>
+        <text class="cls-tag"  x="120" y="318" text-anchor="middle">stateful · learn.py</text>
+        <line class="sep" x1="28" y1="328" x2="212" y2="328"/>
+        <text class="mth" x="36" y="348">docs_search()</text>
+        <text class="mth" x="36" y="364">code_sample_search()</text>
+      </g>
+
+      <!-- ===== GitHubUser (mid-left leaf, direct child) ===== -->
+      <g>
+        <rect class="cls-leaf" x="240" y="280" width="200" height="160" rx="6"/>
+        <text class="cls-name" x="340" y="302" text-anchor="middle">GitHubUser</text>
+        <text class="cls-tag"  x="340" y="318" text-anchor="middle">stateful · github.py</text>
+        <line class="sep" x1="248" y1="328" x2="432" y2="328"/>
+        <text class="mth" x="256" y="348">search_code()</text>
+        <text class="mth" x="256" y="364">search_repos()</text>
+        <text class="mth" x="256" y="380">get_file()</text>
+        <text class="mth" x="256" y="396">whoami()</text>
+        <text class="mth" x="256" y="412">list_issues()</text>
+      </g>
+
+      <!-- ===== StatelessMCPUser (right intermediate) ===== -->
+      <g>
+        <rect class="cls-mid" x="540" y="120" width="200" height="86" rx="6"/>
+        <text class="cls-name" x="640" y="142" text-anchor="middle">StatelessMCPUser</text>
+        <text class="cls-tag"  x="640" y="158" text-anchor="middle">abstract · _base.py</text>
+        <line class="sep" x1="548" y1="168" x2="732" y2="168"/>
+        <text class="mth" x="556" y="188">requires_session = False</text>
+      </g>
+
+      <!-- ===== Context7User (right leaf) ===== -->
+      <g>
+        <rect class="cls-leaf" x="460" y="320" width="200" height="120" rx="6"/>
+        <text class="cls-name" x="560" y="342" text-anchor="middle">Context7User</text>
+        <text class="cls-tag"  x="560" y="358" text-anchor="middle">stateless · context7.py</text>
+        <line class="sep" x1="468" y1="368" x2="652" y2="368"/>
+        <text class="mth" x="476" y="388">query_docs()</text>
+        <text class="mth" x="476" y="404">resolve_library()</text>
+      </g>
+
+      <!-- ===== ADOUser (right-most leaf) ===== -->
+      <g>
+        <rect class="cls-leaf" x="680" y="280" width="200" height="200" rx="6"/>
+        <text class="cls-name" x="780" y="302" text-anchor="middle">ADOUser</text>
+        <text class="cls-tag"  x="780" y="318" text-anchor="middle">stateless · ado.py</text>
+        <line class="sep" x1="688" y1="328" x2="872" y2="328"/>
+        <text class="mth" x="696" y="348">get_bug()</text>
+        <text class="mth" x="696" y="364">my_work_items()</text>
+        <text class="mth" x="696" y="380">search_workitems()</text>
+        <text class="mth" x="696" y="396">list_repos()</text>
+        <text class="mth" x="696" y="412">list_recent_builds()</text>
+        <text class="mth" x="696" y="428">_extra_headers()</text>
+      </g>
+
+      <!-- ===== inheritance arrows (open triangle to parent) ===== -->
+      <!-- LearnUser -> MCPUserBase -->
+      <path class="inh" d="M120,280 L120,240 L380,240 L380,206" marker-end="url(#s6inh)"/>
+      <!-- GitHubUser -> MCPUserBase -->
+      <path class="inh" d="M340,280 L340,206" marker-end="url(#s6inh)"/>
+      <!-- StatelessMCPUser -> MCPUserBase -->
+      <path class="inh" d="M640,120 L640,90 L520,90 L520,70" marker-end="url(#s6inh)"/>
+      <!-- Context7User -> StatelessMCPUser -->
+      <path class="inh" d="M560,320 L560,260 L640,260 L640,206" marker-end="url(#s6inh)"/>
+      <!-- ADOUser -> StatelessMCPUser -->
+      <path class="inh" d="M780,280 L780,230 L640,230 L640,206" marker-end="url(#s6inh)"/>
+    </svg>
+    <figcaption>The factoring. Hollow arrows point at the parent class. Stateful servers inherit <code>MCPUserBase</code> directly; stateless servers route through <code>StatelessMCPUser</code> to skip the DELETE step.</figcaption>
+  </figure>
+
+  <p>
+    With that base in place, <code>learn.py</code> shrinks from the
+    ~120 lines of §2 to about 45 &mdash; a list of queries, the five
+    config constants, two <code>@task</code> methods. The other three
+    per-server files have the same shape. <code>multi.py</code> is
+    twenty lines of imports; Locust loads each <code>User</code>
+    subclass and spawns its declared <code>fixed_count</code>, so one
+    process drives all four servers in parallel. The same files run
+    unchanged in Azure Load Testing via
+    <code>azure-loadtest.yaml</code> &mdash; the engines just need the
+    same env vars.
+  </p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 720 160" role="img"
+         aria-label="Three boxes connected by arrows: per-server scripts feed into the shared base, which runs in either local Locust or Azure Load Testing.">
+      <style>
+        .box-s   { fill: #e9f5ec; stroke: #2f7a3c; stroke-width: 1.4; }
+        .box-c   { fill: #ebf3fb; stroke: #5586b3; stroke-width: 1.4; }
+        .box-r   { fill: #fff4e5; stroke: #b25a00; stroke-width: 1.4; }
+        .bx-tx   { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1a1a1a; }
+        .bx-sub  { font: 11px -apple-system, "Segoe UI", sans-serif; fill: #4a4a4a; }
+        .arrow   { stroke: #6b6b6b; stroke-width: 1.4; fill: none; }
+      </style>
+      <defs>
+        <marker id="s6arr" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/>
+        </marker>
+      </defs>
+
+      <rect class="box-s" x="20"  y="40" width="200" height="80" rx="8"/>
+      <text class="bx-tx"  x="120" y="72" text-anchor="middle">learn.py</text>
+      <text class="bx-tx"  x="120" y="90" text-anchor="middle">github.py</text>
+      <text class="bx-sub" x="120" y="108" text-anchor="middle">context7.py · ado.py</text>
+
+      <rect class="box-c" x="270" y="40" width="180" height="80" rx="8"/>
+      <text class="bx-tx"  x="360" y="78" text-anchor="middle">_base.py</text>
+      <text class="bx-sub" x="360" y="98" text-anchor="middle">+ mcp_client.py</text>
+
+      <rect class="box-r" x="500" y="40" width="200" height="80" rx="8"/>
+      <text class="bx-tx"  x="600" y="78" text-anchor="middle">Local Locust</text>
+      <text class="bx-sub" x="600" y="98" text-anchor="middle">·  Azure Load Testing</text>
+
+      <line class="arrow" x1="220" y1="80" x2="270" y2="80" marker-end="url(#s6arr)"/>
+      <line class="arrow" x1="450" y1="80" x2="500" y2="80" marker-end="url(#s6arr)"/>
+    </svg>
+  </figure>
+
+  <p>
+    Full source &mdash; including <code>_base.py</code>,
+    <code>multi.py</code>, and <code>azure-loadtest.yaml</code> &mdash;
+    at <a href="https://github.com/krishroy92alternate-blip/LoadTestHostedMCPServer">LoadTestHostedMCPServer</a>.
+  </p>
+
+</article>
+
+<footer class="post">
+  Source code: <a href="https://github.com/krishroy92alternate-blip/LoadTestHostedMCPServer">LoadTestHostedMCPServer</a>
+  · Built with Locust 2.43, Python 3.13, uv.
+</footer>
+
+</body>
+</html>

@@ -17,19 +17,24 @@
     cloud runs must finish inside that window.
 
 .EXAMPLE
-    az login --tenant 72f988bf-86f1-41af-91ab-2d7cd011db47
+    $env:ADO_TENANT_ID = '<your-corp-tenant-guid>'
+    az login --tenant $env:ADO_TENANT_ID
     ./scripts/refresh-ado-token.ps1
     az load test-run create --test-id mcp-multi-cloud-smoke ...
 #>
 [CmdletBinding()]
 param(
     [string] $AdoOrg = $(if ($env:ADO_ORG) { $env:ADO_ORG } else { 'krishnaroy' }),
-    [string] $CorpTenantId = '72f988bf-86f1-41af-91ab-2d7cd011db47',
-    [string] $KeyVaultName = 'kv-mcpload-bd97',
-    [string] $SecretName = 'ado-mcp-token'
+    [string] $CorpTenantId = $env:ADO_TENANT_ID,
+    [string] $KeyVaultName = $(if ($env:ADO_MCP_KEYVAULT) { $env:ADO_MCP_KEYVAULT } else { 'kv-mcpload-bd97' }),
+    [string] $SecretName = $(if ($env:ADO_MCP_SECRET_NAME) { $env:ADO_MCP_SECRET_NAME } else { 'ado-mcp-token' })
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ([string]::IsNullOrWhiteSpace($CorpTenantId)) {
+    throw "CorpTenantId is required. Pass -CorpTenantId <guid> or set `$env:ADO_TENANT_ID."
+}
 
 Write-Host "Discovering ADO MCP scope for org '$AdoOrg'..." -ForegroundColor Cyan
 $metaUrl = "https://mcp.dev.azure.com/.well-known/oauth-protected-resource/$AdoOrg"

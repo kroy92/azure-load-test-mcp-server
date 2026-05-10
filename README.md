@@ -7,7 +7,7 @@ Targets:
 | Server | Auth | Session |
 |---|---|---|
 | GitHub MCP (`api.githubcopilot.com`) | Bearer PAT (`GITHUB_MCP_TOKEN`) | Stateful |
-| Microsoft Learn MCP (`learn.microsoft.com/api/mcp`) | None | Stateless |
+| Microsoft Learn MCP (`learn.microsoft.com/api/mcp`) | None | Stateful |
 | Context7 (`mcp.context7.com`) | Optional bearer (`CONTEXT7_API_KEY`) | Stateless |
 | Azure DevOps Remote MCP (`mcp.dev.azure.com/{org}`) | Entra ID OAuth | Stateless |
 

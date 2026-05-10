@@ -18,3 +18,6 @@ scripts/extract_md_figures.py
 scripts/fig_ratios.py
 scripts/make_cover_banner.py
 scripts/strip_html_wrappers.py
+scripts/mb280_probe.py
+scripts/mb280_probe.ps1
+mb280.py

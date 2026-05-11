@@ -48,7 +48,7 @@ uv run locust -f multi.py LearnUser --headless -u 5 -r 1 -t 30s
 
 ```powershell
 # 1. Refresh ADO token (corp tenant) into Key Vault
-az login --tenant 72f988bf-86f1-41af-91ab-2d7cd011db47
+az login --tenant <tenant-id-of-your-ADO-org>
 ./scripts/refresh-ado-token.ps1
 
 # 2. Push test definition (one-time, then `update` for changes)
